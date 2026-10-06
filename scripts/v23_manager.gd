@@ -10,7 +10,10 @@ const NOMS: Dictionary = {
 	"tunnel": "Plongee dans le tunnel",
 	"manege": "Manege autour du mandala",
 	"echelle": "Changement d'echelle",
+	"hardcore": "Mode hardcore",
 }
+const DUREE_HARDCORE: float = 120.0
+const MOUVEMENTS_HARDCORE: Array = [7, 3, 9, 8]
 const NB_TRAINEES: int = 360
 
 var app = null
@@ -42,6 +45,12 @@ var _m_anneau: StandardMaterial3D = null
 var _dir_voyage: Vector3 = Vector3(0.0, 0.0, -1.0)
 var _a0: float = 0.0
 var _r0: float = 6.0
+var _dt: float = 0.0
+var _ph: float = 0.0
+var _hc_arme_t: float = 0.0
+var _hc_bouton: Button = null
+var _hc_haptique: float = 0.0
+var _hc_mv: int = -1
 
 
 func _ready() -> void:
@@ -63,6 +72,11 @@ func _process(dt: float) -> void:
 		if app.panneau != null and app.sc != null and app.camera != null and v19 != null and v19.get("_installe") == true:
 			_installer()
 		return
+
+	if _hc_arme_t > 0.0:
+		_hc_arme_t -= dt
+		if _hc_arme_t <= 0.0 and _hc_bouton != null:
+			_hc_bouton.text = "Mode hardcore (public averti)"
 
 	if _attente_mode != "":
 		_attente_t -= dt
@@ -233,6 +247,14 @@ func _creer_page() -> void:
 	stop.pressed.connect(func() -> void: arreter())
 	p.add_child(stop)
 
+	app.panneau._titre(p, "Mode hardcore")
+	app.panneau._note(p, "Pour les plus endurants : 2 minutes de montee en puissance, tunnel + changements d'echelle de plus en plus violents, mouvements qui s'enchainent, vibrations. Risque de nausee : assieds-toi, ne l'utilise pas si tu es fatigue(e) ou sensible. Aucun flash stroboscopique.")
+	_hc_bouton = Button.new()
+	_hc_bouton.text = "Mode hardcore (public averti)"
+	_hc_bouton.custom_minimum_size = Vector2(0, 92)
+	_hc_bouton.pressed.connect(_demander_hardcore)
+	p.add_child(_hc_bouton)
+
 	_etat_label = Label.new()
 	_etat_label.add_theme_font_size_override("font_size", 25)
 	_etat_label.add_theme_color_override("font_color", Color(0.85, 0.92, 1.0))
@@ -260,6 +282,16 @@ func _set_duree(v: float) -> void:
 func _set_bord(on: bool) -> void:
 	_bord = on
 	_sauver_prefs()
+
+
+func _demander_hardcore() -> void:
+	if _hc_arme_t > 0.0:
+		_hc_arme_t = 0.0
+		_hc_bouton.text = "Mode hardcore (public averti)"
+		_demander("hardcore")
+	else:
+		_hc_arme_t = 8.0
+		_hc_bouton.text = "CONFIRMER : je suis pret(e) et assis(e)"
 
 
 func _demander(mode: String) -> void:
@@ -299,7 +331,11 @@ func _commencer(mode: String) -> void:
 		"o_pos": o.global_position,
 		"o_rot": o.rotation.y,
 		"ws": o.world_scale,
+		"amb": app.son.ambiance,
 	}
+	_ph = 0.0
+	_hc_mv = -1
+	_hc_haptique = 0.0
 	if _bord and mode != "vide":
 		_vignette.visible = true
 	match mode:
@@ -310,11 +346,15 @@ func _commencer(mode: String) -> void:
 			var p0: Vector3 = o.global_position
 			_plateforme.global_position = Vector3(p0.x, p0.y, p0.z)
 			_plateforme.visible = true
-		"tunnel":
+		"tunnel", "hardcore":
 			app.set_dome(true)
 			app.set_mouvement(7)
 			_dir_voyage = (-app.camera.global_transform.basis.z).normalized()
 			_warp.visible = true
+			if mode == "hardcore":
+				_vignette.visible = _bord
+				if app.son.ambiance != 2:
+					app.son.choisir_ambiance(2)
 		"manege":
 			if app.sc.dome_cible > 0.5:
 				app.set_dome(false)
@@ -337,11 +377,13 @@ func _restaurer() -> void:
 	if _mode == "manege" and vivant:
 		o.global_position = _snap["o_pos"]
 		o.rotation.y = float(_snap["o_rot"])
-	if _mode == "tunnel" and vivant:
+	if (_mode == "tunnel" or _mode == "hardcore") and vivant:
 		app.set_dome(bool(_snap["dome"]))
 		app.set_mouvement(int(_snap["mv"]))
 		app.sc.vitesse = float(_snap["vit"])
 		app.sc.anime = bool(_snap["anime"])
+	if _mode == "hardcore" and int(_snap["amb"]) != app.son.ambiance:
+		app.son.choisir_ambiance(int(_snap["amb"]))
 	if vivant:
 		app.sol.visible = bool(_snap["sol"])
 	_plateforme.visible = false
@@ -358,10 +400,11 @@ func _restaurer() -> void:
 
 func _maj(dt: float) -> void:
 	_t += dt
+	_dt = dt
 	# arret : menu ouvert, deux poignees serrees, duree depassee
 	if not _sortie:
 		var deux_poignees: bool = app.main_d.get_float("grip") > 0.85 and app.main_g.get_float("grip") > 0.85
-		if app.panneau.visible or deux_poignees or (_mode != "vide" and _t > _duree):
+		if app.panneau.visible or deux_poignees or (_mode != "vide" and _t > (DUREE_HARDCORE if _mode == "hardcore" else _duree)):
 			arreter()
 	if _sortie:
 		_k = maxf(0.0, _k - dt / 2.5)
@@ -382,6 +425,8 @@ func _maj(dt: float) -> void:
 			_maj_manege(e)
 		"echelle":
 			_maj_echelle(e)
+		"hardcore":
+			_maj_hardcore(e)
 
 
 func _maj_vide(e: float) -> void:
@@ -399,16 +444,18 @@ func _maj_vide(e: float) -> void:
 	_m_anneau.albedo_color = Color(0.5, 0.9, 1.0, 0.9 * e)
 
 
-func _maj_tunnel(e: float) -> void:
-	var vmax: float = 0.7 + 1.8 * _inten
+func _maj_tunnel(e: float, it: float = -1.0) -> void:
+	if it < 0.0:
+		it = _inten
+	var vmax: float = 0.7 + 1.8 * it
 	app.sc.vitesse = lerpf(float(_snap["vit"]), vmax, e)
 	app.sc.anime = true
-	var vit_m: float = (5.0 + 16.0 * _inten) * e
+	var vit_m: float = (5.0 + 16.0 * it) * e
 	_m_warp.set_shader_parameter("cam", app.camera.global_position)
 	_m_warp.set_shader_parameter("dir", _dir_voyage)
 	_m_warp.set_shader_parameter("vitesse", vit_m)
 	_m_warp.set_shader_parameter("force", e)
-	_regler_vignette(0.25 + 0.5 * _inten * e)
+	_regler_vignette(0.25 + 0.5 * it * e)
 
 
 func _maj_manege(e: float) -> void:
@@ -428,14 +475,39 @@ func _maj_manege(e: float) -> void:
 	_regler_vignette(0.3 + 0.45 * _inten * e)
 
 
-func _maj_echelle(e: float) -> void:
-	var periode: float = 20.0
+func _maj_echelle(e: float, it: float = -1.0, periode: float = 20.0) -> void:
 	var x: float = sin(TAU * _t / periode) * e
-	var gros: float = log(1.0 + 5.0 * _inten)
-	var petit: float = log(1.0 + 11.0 * _inten)
+	if it < 0.0:
+		it = _inten
+	else:
+		_ph += _dt * TAU / periode
+		x = sin(_ph) * e
+	var gros: float = log(1.0 + 5.0 * it)
+	var petit: float = log(1.0 + 11.0 * it)
 	var ws: float = exp(x * gros) if x >= 0.0 else exp(x * petit)
 	app.origine.world_scale = float(_snap["ws"]) * ws
-	_regler_vignette(0.2 * _inten * e)
+	if it == _inten:
+		_regler_vignette(0.2 * it * e)
+
+
+## Montee en puissance : intensite de 0,5 a 1,7, mouvements qui s'enchainent, vibrations.
+func _maj_hardcore(e: float) -> void:
+	var p: float = clampf(_t / 90.0, 0.0, 1.0)
+	var it: float = lerpf(0.5, 1.7, p)
+	_maj_tunnel(e, it)
+	var periode: float = lerpf(20.0, 8.0, p)
+	_maj_echelle(e, it, periode)
+	_regler_vignette(0.3 + 0.5 * it * e * 0.7)
+	var mv: int = int(MOUVEMENTS_HARDCORE[int(_t / 20.0) % MOUVEMENTS_HARDCORE.size()])
+	if mv != _hc_mv:
+		_hc_mv = mv
+		app.set_mouvement(mv)
+	app.sc.anime = true
+	_hc_haptique -= _dt
+	if _hc_haptique <= 0.0 and not _sortie:
+		_hc_haptique = lerpf(0.5, 0.18, p)
+		app.main_d.trigger_haptic_pulse("haptic", 0.0, 0.15 + 0.45 * p, 0.08, 0.0)
+		app.main_g.trigger_haptic_pulse("haptic", 0.0, 0.15 + 0.45 * p, 0.08, 0.0)
 
 
 func _regler_vignette(f: float) -> void:
