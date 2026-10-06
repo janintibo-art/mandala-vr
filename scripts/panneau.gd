@@ -74,14 +74,15 @@ func _ready() -> void:
 	_bas.add_theme_font_size_override("font_size", 24)
 	col.add_child(_bas)
 
+	_onglet_modeles()
 	_onglet_genres()
 	_onglet_trait()
 	_onglet_couleurs()
 	_onglet_lumiere()
 	_onglet_relief()
+	_onglet_monde()
 	_onglet_creations()
 	_onglet_diffusion()
-	_onglet_scenes()
 	onglets.tab_changed.connect(_sur_onglet)
 
 	ecran = MeshInstance3D.new()
@@ -137,11 +138,11 @@ func _theme() -> Theme:
 	t.set_color("font_pressed_color", "Button", Color(1, 1, 1))
 	t.set_color("font_hover_color", "Button", Color(1, 1, 1))
 	t.set_color("font_hover_pressed_color", "Button", Color(1, 1, 1))
-	t.set_stylebox("tab_selected", "TabContainer", _style(Color(0.20, 0.42, 0.85), 8, 18, 10))
-	t.set_stylebox("tab_unselected", "TabContainer", _style(Color(0.14, 0.16, 0.25), 8, 18, 10))
-	t.set_stylebox("tab_hovered", "TabContainer", _style(Color(0.26, 0.30, 0.44), 8, 18, 10))
+	t.set_stylebox("tab_selected", "TabContainer", _style(Color(0.20, 0.42, 0.85), 8, 12, 10))
+	t.set_stylebox("tab_unselected", "TabContainer", _style(Color(0.14, 0.16, 0.25), 8, 12, 10))
+	t.set_stylebox("tab_hovered", "TabContainer", _style(Color(0.26, 0.30, 0.44), 8, 12, 10))
 	t.set_stylebox("panel", "TabContainer", _style(Color(0.09, 0.10, 0.17), 8, 8, 8))
-	t.set_font_size("font_size", "TabContainer", 28)
+	t.set_font_size("font_size", "TabContainer", 24)
 	t.set_color("font_selected_color", "TabContainer", Color.WHITE)
 	t.set_color("font_unselected_color", "TabContainer", Color(0.8, 0.84, 0.95))
 	t.set_color("font_hovered_color", "TabContainer", Color.WHITE)
@@ -664,13 +665,14 @@ func rafraichir_diffusion() -> void:
 				rafraichir_diffusion(), 70)
 
 
-# ----------------------------------------------------------- onglet scenes
+# ---------------------------------------------------------- onglet modeles
 
-func _onglet_scenes() -> void:
-	var p: VBoxContainer = _page("Scenes")
-	_titre(p, "Scenes livrees")
+func _onglet_modeles() -> void:
+	var p: VBoxContainer = _page("Modeles")
+	_titre(p, "Modeles")
+	_note(p, "Un clic : genre, couleurs, lumiere, monde autour de toi et son. Les 8 premiers : Matrix, Vitrail, Smiley.")
 	var noms: Array = []
-	for c in Generateur.configs_livrees():
+	for c in Generateur.modeles():
 		noms.append(str((c as Dictionary)["nom"]))
 	_grille(p, "", noms, 3, Callable(), func(i: int) -> void: app.scene_livree(i))
 	_titre(p, "Hasard")
@@ -683,7 +685,31 @@ func _onglet_scenes() -> void:
 	_bouton(r2, "Toile vierge", func() -> void: app.vierge())
 	_bouton(r2, "Retour au depart", func() -> void: app.retour_depart())
 	_titre(p, "Manettes")
-	_note(p, "Joystick gauche : voler. Gachette gauche : accelerer. Joystick droit : tourner / monter. Gachette droite : dessiner. A : genre suivant. B : palette suivante. X : mode de couleur. Y : relief. Clic joystick droit : tirage au sort. Grip droit : annuler. Grip gauche : retour au depart. Bouton menu gauche : ce menu.")
+	_note(p, "Joystick gauche : voler. Gachette gauche : accelerer. Joystick droit : tourner / monter. Gachette droite : dessiner. A : genre suivant. B : palette suivante. X : mode de couleur. Y : relief. Clic joystick droit : tirage au sort. Clic joystick gauche : pause. Grip droit : annuler. Grip gauche : retour au depart. Bouton menu gauche : ce menu.")
+
+
+# ------------------------------------------------------------- onglet monde
+
+func _onglet_monde() -> void:
+	var p: VBoxContainer = _page("Monde")
+	_titre(p, "Monde autour de toi")
+	_grille(p, "monde", Monde.NOMS, 4, func() -> int: return app.monde.courant, func(i: int) -> void: app.set_monde(i))
+	_titre(p, "Projection")
+	_grille(p, "dome", ["Plan devant toi", "Dome autour de toi"], 2, func() -> int: return 1 if app.sc.dome_cible > 0.5 else 0, func(i: int) -> void: app.set_dome(i == 1))
+	_curseur(p, "ouverture", "Ouverture du dome (degres depuis le pole)", 70, 170, 1, func() -> float: return rad_to_deg(app.sc.dome_ang), func(v: float) -> void: app.set_ouverture(v), "%d")
+	_bouton(p, "Recentrer le dome sur moi", func() -> void: app.recentrer_dome())
+	_note(p, "Dans le dome, le mandala t'entoure : tu es au centre. Dessine sur la voute avec le rayon.")
+	_titre(p, "Ambiance sonore")
+	_grille(p, "ambiance", Son.NOMS_AMBIANCES, 3, func() -> int: return app.son.ambiance, func(i: int) -> void: app.son.choisir_ambiance(i))
+	_curseur(p, "volume", "Volume", 0.0, 1.0, 0.01, func() -> float: return app.son.volume, func(v: float) -> void: app.son.regler_volume(v))
+	_bascule(p, "muet", "Son coupe", func() -> bool: return app.son.muet, func(on: bool) -> void:
+		if on != app.son.muet:
+			app.son.basculer_muet())
+	_titre(p, "Notes quand tu dessines")
+	_grille(p, "gamme", Son.NOMS_GAMMES, 3, func() -> int: return app.son.gamme, func(i: int) -> void:
+		app.son.gamme = i
+		app.son.reinitialiser())
+	_note(p, "Chaque trait joue des notes : plus tu dessines pres du centre, plus c'est aigu.")
 
 
 func _sur_onglet(i: int) -> void:

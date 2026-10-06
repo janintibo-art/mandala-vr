@@ -21,6 +21,14 @@ var anime: bool = true
 var budget: int = 90000
 var fx: Dictionary = {"gain": 0.55, "halo": 0.5, "coeur": 0.4, "scint": 0.0, "pulse": 0.0, "arc": 0.0, "vit": 1.0}
 
+var ciel: bool = false
+var dome: float = 0.0
+var dome_cible: float = 0.0
+var dome_ang: float = 1.9
+var dome_r: float = 7.0
+var dome_c: Vector3 = Vector3(0.0, 1.6, 0.0)
+var dome_b: Basis = Basis()
+
 var reduction_boucle: float = 0.62
 var torsion_boucle: float = 0.35
 
@@ -87,7 +95,7 @@ func fond_clair() -> bool:
 
 
 func additif() -> bool:
-	return lumineux and not fond_clair()
+	return lumineux and (ciel or not fond_clair())
 
 
 func _maj_adapt() -> void:
@@ -102,6 +110,11 @@ func appliquer_fx() -> void:
 			continue
 		sm.set_shader_parameter("gain", float(fx["gain"]))
 		sm.set_shader_parameter("adapt", adapt)
+		sm.set_shader_parameter("dome", dome)
+		sm.set_shader_parameter("dome_c", dome_c)
+		sm.set_shader_parameter("dome_r", dome_r)
+		sm.set_shader_parameter("dome_ang", dome_ang)
+		sm.set_shader_parameter("dome_b", dome_b)
 		sm.set_shader_parameter("halo", float(fx["halo"]))
 		sm.set_shader_parameter("coeur", float(fx["coeur"]))
 		sm.set_shader_parameter("scint", float(fx["scint"]))
@@ -490,7 +503,51 @@ func _ecart(p: Vector3) -> float:
 	return p.z - relief_monde(p.x, p.y)
 
 
+func regler_dome(actif_: bool, cam_pos: Vector3, yaw: float, recentrer: bool = true) -> void:
+	dome_cible = 1.0 if actif_ else 0.0
+	if recentrer:
+		dome_c = cam_pos
+		dome_b = Basis(Vector3.UP, yaw)
+	appliquer_fx()
+
+
+func dome_map(rel: Vector3) -> Vector3:
+	var th: float = minf(Vector2(rel.x, rel.y).length() / (RM * PX) * dome_ang, 3.0)
+	var ph: float = atan2(rel.y, rel.x)
+	var d: Vector3 = Vector3(sin(th) * cos(ph), sin(th) * sin(ph), -cos(th))
+	return dome_c + (dome_b * d) * (dome_r + rel.z)
+
+
+func vers_monde(pt: Vector3) -> Vector3:
+	if dome >= 0.5:
+		return dome_map(pt)
+	return to_global(pt)
+
+
+func _viser_dome(o_w: Vector3, d_w: Vector3) -> Variant:
+	var d: Vector3 = d_w.normalized()
+	var oc: Vector3 = o_w - dome_c
+	var b: float = oc.dot(d)
+	var c: float = oc.dot(oc) - dome_r * dome_r
+	var disc: float = b * b - c
+	if disc < 0.0:
+		return null
+	var t: float = -b + sqrt(disc)
+	if t <= 0.0:
+		return null
+	var dir: Vector3 = ((oc + d * t) / dome_r)
+	dir = dome_b.inverse() * dir
+	var th: float = acos(clampf(-dir.z, -1.0, 1.0))
+	var u: float = th / dome_ang
+	if u > 1.02:
+		return null
+	var ph: float = atan2(dir.y, dir.x)
+	return Vector3(cos(ph), sin(ph), 0.0) * u * RM * PX
+
+
 func viser(o_w: Vector3, d_w: Vector3) -> Variant:
+	if dome >= 0.5:
+		return _viser_dome(o_w, d_w)
 	var inv: Transform3D = global_transform.affine_inverse()
 	var o: Vector3 = inv * o_w
 	var d: Vector3 = (inv.basis * d_w).normalized()
@@ -579,6 +636,9 @@ func appliquer_pivots() -> void:
 
 
 func _process(dt: float) -> void:
+	if absf(dome - dome_cible) > 0.0005:
+		dome = move_toward(dome, dome_cible, dt * 0.6)
+		appliquer_fx()
 	if anime:
 		temps += dt
 	appliquer_pivots()

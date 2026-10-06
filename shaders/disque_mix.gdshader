@@ -6,6 +6,9 @@ varying vec3 wpos;
 
 void vertex() {
 	vec3 wc = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	if (dome > 0.001) {
+		wc = mix(wc, dome_map(wc - MODEL_MATRIX[3].xyz), dome);
+	}
 	wpos = wc;
 	float sc = length(MODEL_MATRIX[0].xyz);
 	float el = 1.0 + halo * 1.5;

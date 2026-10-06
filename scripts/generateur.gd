@@ -118,25 +118,42 @@ static func _cfg(nom: String, g: String, pal: String, b: int, e: float, o: float
 		"vitesse": float(extra.get("vitesse", 1.0)),
 		"fond": int(extra.get("fond", 0)),
 		"fx": extra.get("fx", {}),
+		"monde": int(extra.get("monde", 0)),
+		"ambiance": int(extra.get("ambiance", 0)),
 	}
+
+
+static func modeles() -> Array:
+	var l: Array = [
+		_cfg("Matrix", "Matrix", "Matrix", 16, 1.1, 0.85, 3, {"espacement": 4, "fond": 1, "fx": Presets.fx("Neon"), "monde": 6, "ambiance": 2}),
+		_cfg("Pluie Matrix", "Pluie", "Matrix", 20, 1.0, 0.8, 3, {"espacement": 3, "fond": 1, "fx": Presets.fx("Neon"), "monde": 6, "ambiance": 3}),
+		_cfg("Vitrail", "Vitrail", "Cathedrale", 12, 2.2, 1.0, 1, {"fond": 1, "fx": Presets.fx("Vitrail"), "monde": 7, "ambiance": 1}),
+		_cfg("Rosace de vitrail", "Cathedrale", "Cathedrale", 16, 2.0, 1.0, 1, {"rel_mode": 1, "rel_h": 0.5, "fond": 1, "fx": Presets.fx("Vitrail"), "monde": 7, "ambiance": 2}),
+		_cfg("Smiley", "Tampons", "Citron", 12, 1.2, 0.95, 1, {"symbole": "Smiley", "espacement": 4, "fx": Presets.fx("Doux"), "monde": 1, "ambiance": 1}),
+		_cfg("Guirlande de smileys", "Guirlande", "Bonbon", 10, 1.3, 0.95, 2, {"symbole": "Smiley", "espacement": 3, "fx": Presets.fx("Doux"), "monde": 2, "ambiance": 1}),
+		_cfg("Semis de smileys", "Semis", "Recif", 14, 1.0, 0.95, 9, {"symbole": "Smiley", "espacement": 5, "fx": Presets.fx("Etincelles"), "monde": 1}),
+		_cfg("Smileys sans fin", "Cascade", "Prisme", 12, 1.2, 0.95, 2, {"symbole": "Smiley", "espacement": 4, "iterations": 6, "reduction": 0.7, "torsion": 0.3, "mouvement": 7, "vitesse": 0.6, "fx": Presets.fx("Arc-en-ciel"), "monde": 2}),
+	]
+	l.append_array(configs_livrees())
+	return l
 
 
 static func configs_livrees() -> Array:
 	return [
-		_cfg("Cathedrale", "Cathedrale", "Cathedrale", 12, 2.2, 1.0, 1, {"fx": Presets.fx("Vitrail")}),
-		_cfg("Nuit Matrix", "Matrix", "Matrix", 16, 1.1, 0.72, 3, {"espacement": 4, "fond": 1, "fx": Presets.fx("Neon")}),
-		_cfg("Dome d'argent", "Toile", "Argent", 14, 1.0, 0.8, 5, {"rel_mode": 1, "rel_h": 0.82, "mouvement": 1, "vitesse": 0.6, "fx": Presets.fx("Cristal")}),
-		_cfg("Puits sans fond", "Gigogne", "Encre", 10, 1.6, 0.9, 4, {"iterations": 7, "reduction": 0.68, "torsion": 0.4, "rel_mode": 3, "rel_h": 0.9, "mouvement": 7, "vitesse": 0.7, "fx": Presets.fx("Neon")}),
-		_cfg("Givre clair", "Givre", "Lagon", 18, 0.9, 0.85, 1, {"fond": 3, "fx": Presets.fx("Mat")}),
-		_cfg("Constellation", "Constellation", "Argent", 20, 0.8, 0.95, 9, {"fond": 1, "fx": Presets.fx("Cristal")}),
-		_cfg("Vitrail tournant", "Vitrail", "Cathedrale", 10, 2.0, 1.0, 1, {"rel_mode": 1, "rel_h": 0.6, "mouvement": 6, "vitesse": 0.5, "fx": Presets.fx("Vitrail")}),
-		_cfg("Spirale d'or", "Fractale", "Or", 8, 1.3, 0.9, 4, {"iterations": 12, "reduction": 0.93, "torsion": 0.28, "mouvement": 7, "vitesse": 0.8, "fx": Presets.fx("Braise")}),
-		_cfg("Dentelle de braise", "Filigrane", "Braise", 12, 1.1, 0.9, 4, {"iterations": 6, "reduction": 0.7, "torsion": 0.5, "fx": Presets.fx("Braise")}),
-		_cfg("Circuit imprime", "Circuit", "Jade", 8, 1.4, 1.0, 8, {"fond": 1, "fx": Presets.fx("Neon")}),
-		_cfg("Meduse", "Meduse", "Polaire", 9, 1.0, 0.8, 5, {"iterations": 5, "reduction": 0.74, "torsion": 0.22, "rel_mode": 1, "rel_h": 0.7, "mouvement": 4, "vitesse": 0.9, "fx": Presets.fx("Aurore")}),
-		_cfg("Chapelet d'etoiles", "Cascade", "Prisme", 12, 1.2, 0.95, 2, {"symbole": "Etoile", "espacement": 5, "iterations": 5, "reduction": 0.66, "torsion": 0.3, "fx": Presets.fx("Arc-en-ciel")}),
-		_cfg("Nuit de glace", "Rosace infinie", "Banquise", 14, 1.2, 0.9, 10, {"iterations": 8, "reduction": 0.72, "torsion": 0.3, "fond": 4, "mouvement": 7, "vitesse": 0.6, "fx": Presets.fx("Cristal")}),
-		_cfg("Lave vivante", "Nebuleuse", "Lave", 16, 1.8, 0.85, 12, {"rel_mode": 4, "rel_h": 0.7, "fond": 1, "mouvement": 3, "vitesse": 0.5, "fx": Presets.fx("Braise")}),
+		_cfg("Cathedrale", "Cathedrale", "Cathedrale", 12, 2.2, 1.0, 1, {"fx": Presets.fx("Vitrail"), "monde": 7, "ambiance": 2}),
+		_cfg("Nuit Matrix", "Matrix", "Matrix", 16, 1.1, 0.72, 3, {"espacement": 4, "fond": 1, "fx": Presets.fx("Neon"), "monde": 6}),
+		_cfg("Dome d'argent", "Toile", "Argent", 14, 1.0, 0.8, 5, {"rel_mode": 1, "rel_h": 0.82, "mouvement": 1, "vitesse": 0.6, "fx": Presets.fx("Cristal"), "monde": 1, "ambiance": 3}),
+		_cfg("Puits sans fond", "Gigogne", "Encre", 10, 1.6, 0.9, 4, {"iterations": 7, "reduction": 0.68, "torsion": 0.4, "rel_mode": 3, "rel_h": 0.9, "mouvement": 7, "vitesse": 0.7, "fx": Presets.fx("Neon"), "monde": 4, "ambiance": 2}),
+		_cfg("Givre clair", "Givre", "Lagon", 18, 0.9, 0.85, 1, {"fond": 3, "fx": Presets.fx("Mat"), "ambiance": 5}),
+		_cfg("Constellation", "Constellation", "Argent", 20, 0.8, 0.95, 9, {"fond": 1, "fx": Presets.fx("Cristal"), "monde": 1, "ambiance": 2}),
+		_cfg("Vitrail tournant", "Vitrail", "Cathedrale", 10, 2.0, 1.0, 1, {"rel_mode": 1, "rel_h": 0.6, "mouvement": 6, "vitesse": 0.5, "fx": Presets.fx("Vitrail"), "monde": 7}),
+		_cfg("Spirale d'or", "Fractale", "Or", 8, 1.3, 0.9, 4, {"iterations": 12, "reduction": 0.93, "torsion": 0.28, "mouvement": 7, "vitesse": 0.8, "fx": Presets.fx("Braise"), "monde": 5}),
+		_cfg("Dentelle de braise", "Filigrane", "Braise", 12, 1.1, 0.9, 4, {"iterations": 6, "reduction": 0.7, "torsion": 0.5, "fx": Presets.fx("Braise"), "monde": 5}),
+		_cfg("Circuit imprime", "Circuit", "Jade", 8, 1.4, 1.0, 8, {"fond": 1, "fx": Presets.fx("Neon"), "monde": 6}),
+		_cfg("Meduse", "Meduse", "Polaire", 9, 1.0, 0.8, 5, {"iterations": 5, "reduction": 0.74, "torsion": 0.22, "rel_mode": 1, "rel_h": 0.7, "mouvement": 4, "vitesse": 0.9, "fx": Presets.fx("Aurore"), "monde": 4, "ambiance": 4}),
+		_cfg("Chapelet d'etoiles", "Cascade", "Prisme", 12, 1.2, 0.95, 2, {"symbole": "Etoile", "espacement": 5, "iterations": 5, "reduction": 0.66, "torsion": 0.3, "fx": Presets.fx("Arc-en-ciel"), "monde": 2, "ambiance": 1}),
+		_cfg("Nuit de glace", "Rosace infinie", "Banquise", 14, 1.2, 0.9, 10, {"iterations": 8, "reduction": 0.72, "torsion": 0.3, "fond": 4, "mouvement": 7, "vitesse": 0.6, "fx": Presets.fx("Cristal"), "monde": 3}),
+		_cfg("Lave vivante", "Nebuleuse", "Lave", 16, 1.8, 0.85, 12, {"rel_mode": 4, "rel_h": 0.7, "fond": 1, "mouvement": 3, "vitesse": 0.5, "fx": Presets.fx("Braise"), "monde": 5}),
 	]
 
 
@@ -176,4 +193,6 @@ static func tirage(h: RandomNumberGenerator, nom: String, vizu: bool = false) ->
 		"vitesse": 0.4 + h.randf() * (1.1 if vizu else 1.2),
 		"fond": 3 if claire else int(FONDS_SOMBRES[h.randi_range(0, FONDS_SOMBRES.size() - 1)]),
 		"fx": Presets.fx(str(noms_fx[h.randi_range(0, noms_fx.size() - 1)])),
+		"monde": h.randi_range(1, Monde.NOMS.size() - 1) if not claire else 0,
+		"ambiance": h.randi_range(0, Son.NOMS_AMBIANCES.size() - 1),
 	}

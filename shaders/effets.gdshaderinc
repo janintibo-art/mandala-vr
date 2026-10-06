@@ -34,3 +34,18 @@ vec3 effets_couleur(vec3 c, float noyau, vec3 wp) {
 float gain_eff() {
 	return gain * adapt;
 }
+
+// Projection en dome autour du spectateur (0 = plan, 1 = dome)
+uniform float dome = 0.0;
+uniform vec3 dome_c = vec3(0.0);
+uniform float dome_r = 7.0;
+uniform float dome_ang = 1.9;
+uniform mat3 dome_b;
+
+vec3 dome_map(vec3 rel) {
+	float r = length(rel.xy);
+	float th = min(r / 6.0 * dome_ang, 3.0);
+	float ph = atan(rel.y, rel.x);
+	vec3 d = vec3(sin(th) * cos(ph), sin(th) * sin(ph), -cos(th));
+	return dome_c + (dome_b * d) * (dome_r + rel.z);
+}

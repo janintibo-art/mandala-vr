@@ -5,7 +5,7 @@ extends RefCounted
 ## plus quelques champs propres a la VR (ignores par le telephone).
 
 
-static func encoder(nom: String, sc: Scene3D) -> String:
+static func encoder(nom: String, sc: Scene3D, extras: Dictionary = {}) -> String:
 	var liste: Array = []
 	var perso: Dictionary = {}
 	for t in sc.traits:
@@ -33,7 +33,7 @@ static func encoder(nom: String, sc: Scene3D) -> String:
 		"relief": {"mode": sc.rel_mode, "hauteur": sc.rel_h, "inclinaison": 0.0, "lumiere": sc.rel_lum},
 		"traits": liste,
 		"vr": {"fx": sc.fx, "lumineux": sc.lumineux, "perso": perso,
-			"reduction": sc.reduction_boucle, "torsion": sc.torsion_boucle},
+			"reduction": sc.reduction_boucle, "torsion": sc.torsion_boucle, "extras": extras},
 	})
 
 
@@ -116,6 +116,7 @@ static func decoder(source: String) -> Dictionary:
 		"lumineux": bool(vr.get("lumineux", true)),
 		"reduction": _num(vr, "reduction", 0.62),
 		"torsion": _num(vr, "torsion", 0.35),
+		"extras": vr.get("extras", {}) if vr.get("extras", null) is Dictionary else {},
 	}
 	return out
 

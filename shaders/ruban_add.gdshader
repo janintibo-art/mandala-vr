@@ -7,6 +7,13 @@ varying vec3 wpos;
 void vertex() {
 	vec3 wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	vec3 wd = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
+	if (dome > 0.001) {
+		vec3 rel = wp - MODEL_MATRIX[3].xyz;
+		vec3 pd = dome_map(rel);
+		vec3 dd = normalize(dome_map(rel + wd * 0.05) - pd);
+		wp = mix(wp, pd, dome);
+		wd = normalize(mix(wd, dd, dome));
+	}
 	vec3 vue = INV_VIEW_MATRIX[3].xyz - wp;
 	vec3 cote = cross(wd, vue);
 	float l = length(cote);

@@ -14,6 +14,10 @@ var sc: Scene3D
 var panneau: Panneau
 var env: Environment
 var sol: MeshInstance3D
+var monde: Monde
+var son: Son
+var _jingle_fait: bool = false
+var _haptique_t: float = 0.0
 
 var reg: Reglages = Reglages.new()
 var tout: bool = true
@@ -91,6 +95,11 @@ func _construire_monde() -> void:
 	add_child(sc)
 	sc.appliquer_fond(env)
 
+	monde = Monde.new()
+	add_child(monde)
+	son = Son.new()
+	add_child(son)
+
 
 func _construire_joueur() -> void:
 	origine = XROrigin3D.new()
@@ -156,6 +165,7 @@ func _construire_joueur() -> void:
 	_aide.text = _texte_aide()
 	add_child(_aide)
 
+	monde.camera = camera
 	panneau = Panneau.new()
 	panneau.app = self
 	panneau.visible = false
@@ -244,6 +254,12 @@ func _charger_prefs() -> void:
 	vizu_duree = float(p.get("vizu", 20.0))
 	sol_visible = bool(p.get("sol", true))
 	sol.visible = sol_visible
+	son.volume = float(p.get("volume", 0.6))
+	son.gamme = clampi(int(p.get("gamme", 0)), 0, 5)
+	sc.dome_ang = deg_to_rad(clampf(float(p.get("ouverture", 109.0)), 70.0, 170.0))
+	var amb: int = clampi(int(p.get("ambiance", 0)), 0, 5)
+	if amb > 0:
+		son.choisir_ambiance(amb)
 	panneau.palettes_changees()
 
 
@@ -264,6 +280,8 @@ func _sauver_prefs() -> void:
 	Stockage.sauver_prefs({
 		"perso": perso, "fx": sc.fx, "qualite": qualite, "lumineux": sc.lumineux,
 		"tout": tout, "duree": duree_defaut, "vizu": vizu_duree, "sol": sol_visible,
+		"volume": son.volume, "gamme": son.gamme, "ambiance": son.ambiance,
+		"ouverture": rad_to_deg(sc.dome_ang),
 	})
 
 
@@ -334,7 +352,7 @@ func set_vitesse(v: float) -> void:
 
 func set_sol(on: bool) -> void:
 	sol_visible = on
-	sol.visible = on
+	sol.visible = on and sc.dome_cible < 0.5
 	_prefs_a_sauver()
 
 
@@ -357,6 +375,35 @@ func preset_fx(nom: String) -> void:
 	sc.appliquer_fx()
 	panneau.rafraichir()
 	message("Ambiance : " + nom)
+	_prefs_a_sauver()
+
+
+func set_monde(i: int) -> void:
+	monde.appliquer(i)
+	sc.ciel = i > 0
+	sc.appliquer_materiaux()
+	panneau.rafraichir()
+
+
+func _yaw_camera() -> float:
+	var f: Vector3 = -camera.global_transform.basis.z
+	return atan2(-f.x, -f.z)
+
+
+func set_dome(on: bool) -> void:
+	sc.regler_dome(on, camera.global_position, _yaw_camera())
+	sol.visible = sol_visible and not on
+	message("Dome autour de toi" if on else "Plan devant toi")
+
+
+func recentrer_dome() -> void:
+	sc.regler_dome(sc.dome_cible > 0.5, camera.global_position, _yaw_camera())
+	message("Dome recentre")
+
+
+func set_ouverture(deg: float) -> void:
+	sc.dome_ang = deg_to_rad(deg)
+	sc.appliquer_fx()
 	_prefs_a_sauver()
 
 
@@ -394,6 +441,10 @@ func _appliquer_config(c: Dictionary) -> void:
 	sc.anime = true
 	var traits: Array = Generateur.composer_scene(reg, RM, rng)
 	sc.installer(traits)
+	set_monde(int(c.get("monde", 0)))
+	var amb: int = int(c.get("ambiance", 0))
+	if amb > 0 and amb != son.ambiance:
+		son.choisir_ambiance(amb)
 	sc.appliquer_fond(env)
 	_maj_boucle()
 	_maj_hud()
@@ -402,7 +453,7 @@ func _appliquer_config(c: Dictionary) -> void:
 
 func scene_livree(i: int) -> void:
 	diff_stop()
-	var l: Array = Generateur.configs_livrees()
+	var l: Array = Generateur.modeles()
 	var c: Dictionary = l[i]
 	_appliquer_config(c)
 	message(str(c["nom"]))
@@ -446,7 +497,7 @@ func _cycler(champ: String, pas: int, total: int, nom: String) -> void:
 
 func sauver() -> void:
 	var nom: String = "%s - %s" % [str(Tables.GENRES[reg.genre][0]), Time.get_datetime_string_from_system().replace("T", " ").substr(5, 11)]
-	var id: String = Stockage.ecrire(Oeuvre.encoder(nom, sc))
+	var id: String = Stockage.ecrire(Oeuvre.encoder(nom, sc, {"monde": monde.courant, "ambiance": son.ambiance, "dome": sc.dome_cible, "ouverture": rad_to_deg(sc.dome_ang)}))
 	message("Enregistre : " + nom if id != "" else "Echec de l'enregistrement")
 
 
@@ -460,6 +511,13 @@ func _charger_sans_message(id: String) -> bool:
 	for t in sc.traits:
 		reg = (t as TraitDessin).reglages.copie()
 		break
+	var ex: Dictionary = o["extras"]
+	if ex.has("monde"):
+		set_monde(int(ex["monde"]))
+	if ex.has("ambiance") and int(ex["ambiance"]) > 0 and int(ex["ambiance"]) != son.ambiance:
+		son.choisir_ambiance(int(ex["ambiance"]))
+	if ex.has("ouverture"):
+		sc.dome_ang = deg_to_rad(clampf(float(ex["ouverture"]), 70.0, 170.0))
 	_maj_boucle()
 	_maj_hud()
 	panneau.palettes_changees()
@@ -770,6 +828,8 @@ func _entrees(dt: float) -> void:
 		var hp: Dictionary = hit_panneau
 		sur_panneau = true
 		panneau.souris(hp["px"], gachette)
+		if _front("clic_menu", gachette):
+			main_d.trigger_haptic_pulse("haptic", 0.0, 0.5, 0.04, 0.0)
 		longueur = float(hp["t"])
 		_curseur.visible = true
 		_curseur.scale = Vector3(0.25, 0.25, 0.25)
@@ -787,8 +847,9 @@ func _entrees(dt: float) -> void:
 		if hit != null:
 			var pt: Vector3 = hit
 			_curseur.visible = true
-			_curseur.global_position = sc.to_global(pt)
-			longueur = maxf(0.1, o_ray.distance_to(sc.to_global(pt)))
+			var wp: Vector3 = sc.vers_monde(pt)
+			_curseur.global_position = wp
+			longueur = maxf(0.1, o_ray.distance_to(wp))
 		else:
 			_curseur.visible = false
 	_rayon.scale = Vector3(1.0, 1.0, longueur)
@@ -847,9 +908,16 @@ func _entrees(dt: float) -> void:
 			_live_k = sc.calque_de(pt2)
 			sc.live_debut(reg.copie(), _live_k)
 			_aide_temps = 0.0
-		sc.live_point(sc.vers_local(_live_k, pt2))
+		var pl: Vector2 = sc.vers_local(_live_k, pt2)
+		sc.live_point(pl)
+		son.jouer_note(pl.length() / RM, main_d.get_float("trigger"))
+		_haptique_t -= dt
+		if _haptique_t <= 0.0:
+			_haptique_t = 0.06
+			main_d.trigger_haptic_pulse("haptic", 0.0, 0.35, 0.05, 0.0)
 	elif sc.live_actif():
 		sc.live_fin()
+		son.reinitialiser()
 
 
 func panneau_bloque() -> bool:
@@ -859,6 +927,9 @@ func panneau_bloque() -> bool:
 func _process(dt: float) -> void:
 	if main_d == null:
 		return
+	if not _jingle_fait and son._jingle != null:
+		_jingle_fait = true
+		son.demarrage()
 	_entrees(dt)
 	_diff_maj(dt)
 	if _msg_temps > 0.0:
