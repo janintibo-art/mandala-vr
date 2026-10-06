@@ -10,6 +10,10 @@ uniform float show_sparks = 1.0;
 uniform float breath = 1.0;
 uniform int style = 1;
 
+// v19 : reaction au bus Master et aux impacts de dessin.
+uniform float reactive : hint_range(0.0, 1.0) = 0.0;
+uniform float draw_flash : hint_range(0.0, 1.0) = 0.0;
+
 float hash21(vec2 p) {
 	p = fract(p * vec2(123.34, 456.21));
 	p += dot(p, p + 45.32);
@@ -37,7 +41,6 @@ void fragment() {
 
 	float e = 0.0;
 
-	// Grand halo atmospherique autour du mandala.
 	if (show_aura > 0.5) {
 		float halo = exp(-pow((r - 0.70) / 0.22, 2.0));
 		float centre = exp(-r * r * 2.8) * 0.08;
@@ -45,7 +48,6 @@ void fragment() {
 		e += (halo * 0.22 + centre) * pulse;
 	}
 
-	// Trois anneaux tres fins, animes dans des sens differents.
 	if (show_rings > 0.5) {
 		float r1 = 0.73 + 0.012 * sin(t * 0.8);
 		float r2 = 0.82 + 0.010 * sin(-t * 0.65 + 1.7);
@@ -55,23 +57,33 @@ void fragment() {
 		float a3 = exp(-pow((r - r3) / 0.006, 2.0));
 		float arcs = 0.58 + 0.42 * sin(ang * 9.0 - t * 1.2);
 		e += (a1 * 0.22 + a2 * 0.18 + a3 * 0.13) * (0.72 + arcs * 0.28);
+
+		// Onde de niveau sonore autour du coeur.
+		float beat_r = 0.56 + reactive * 0.09;
+		float beat = exp(-pow((r - beat_r) / (0.018 + reactive * 0.018), 2.0));
+		e += beat * reactive * 0.46;
 	}
 
-	// Etincelles procedurales : aucune particule 3D supplementaire.
 	if (show_sparks > 0.5) {
 		vec2 cell = floor((p + 1.0) * 18.0);
 		float h = hash21(cell);
 		vec2 fp = fract((p + 1.0) * 18.0) - 0.5;
-		float active = step(0.935, h);
+		float active = step(0.935 - reactive * 0.020, h);
 		float rr = length(fp);
 		float blink = pow(0.5 + 0.5 * sin(t * (2.0 + h * 3.0) + h * 80.0), 8.0);
 		float zone = smoothstep(1.02, 0.52, r) * smoothstep(0.38, 0.58, r);
-		e += active * smoothstep(0.18, 0.0, rr) * blink * zone * 0.46;
+		e += active * smoothstep(0.18, 0.0, rr) * blink * zone * (0.46 + reactive * 0.22);
 	}
 
-	// La respiration agit comme un petit gain lumineux, en plus de l'echelle du quad.
+	// Impact global bref au debut d'un trait ou lors d'une note.
+	float impact = exp(-pow((r - (0.42 + draw_flash * 0.20)) / 0.055, 2.0));
+	e += impact * draw_flash * 0.55;
+
 	e *= mix(0.90, 1.10, clamp((breath - 0.92) / 0.16, 0.0, 1.0));
+	e *= 1.0 + reactive * 0.65 + draw_flash * 0.28;
 	e *= intensity;
+
+	col = mix(col, vec3(1.0), clamp(draw_flash * 0.28 + reactive * 0.08, 0.0, 0.40));
 
 	ALBEDO = col * e * 2.0;
 	ALPHA = clamp(e, 0.0, 1.0);
