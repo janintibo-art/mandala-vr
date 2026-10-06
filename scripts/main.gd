@@ -962,6 +962,8 @@ func _process(dt: float) -> void:
 		_msg_temps -= dt
 		if _msg_temps <= 0.0:
 			_msg_label.text = ""
+			if panneau != null:
+				panneau.message("Mandala VR")
 	if _aide != null and _aide.visible:
 		_aide_temps -= dt
 		if _aide_temps <= 0.0:

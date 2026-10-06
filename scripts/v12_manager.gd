@@ -283,7 +283,7 @@ func _appliquer_environnement() -> void:
 		return
 	var en_passthrough: bool = v8 != null and bool(v8.get("_passthrough"))
 
-	app.env.tonemap_mode = Environment.TONE_MAPPER_ACES
+	app.env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	app.env.tonemap_exposure = _exposition
 	app.env.tonemap_white = 4.0
 
@@ -295,11 +295,11 @@ func _appliquer_environnement() -> void:
 	# En realite mixte on coupe le bloom pour garder une camera propre.
 	app.env.glow_enabled = _glow and not en_passthrough
 	app.env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SCREEN
-	app.env.glow_hdr_threshold = 0.88
-	app.env.glow_hdr_scale = 1.35
-	app.env.glow_intensity = 1.15 + _glow_force * 0.55
-	app.env.glow_strength = 0.70 + _glow_force * 0.60
-	app.env.glow_bloom = _glow_force * 0.11
+	app.env.glow_hdr_threshold = 1.15
+	app.env.glow_hdr_scale = 1.0
+	app.env.glow_intensity = 0.50 + _glow_force * 0.40
+	app.env.glow_strength = 0.80
+	app.env.glow_bloom = _glow_force * 0.03
 
 
 func _appliquer_shaders() -> void:

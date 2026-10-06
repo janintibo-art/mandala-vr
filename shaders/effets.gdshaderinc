@@ -152,7 +152,7 @@ vec3 effets_couleur(vec3 c, float noyau, float bord, vec3 wp) {
 	if (scint > 0.0) {
 		g *= 1.0 + scint * 0.6 * sin(t * 6.0 + dot(wp, vec3(12.9898, 78.233, 37.719)));
 	}
-	c = mix(c, vec3(1.0), coeur * noyau);
+	c = mix(c, vec3(1.0), coeur * noyau * 0.65);
 	c = v12_finition(c * g, noyau, wp);
 	return v14_materiau(c, noyau, bord, wp);
 }

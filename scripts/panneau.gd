@@ -27,6 +27,7 @@ var _zone_seq: VBoxContainer
 var _famille: int = 0
 var _grilles_genres: Array = []
 var _liste_choisie: int = 0
+var _desc_mouv: Label = null
 
 
 class Pastille extends Button:
@@ -79,6 +80,7 @@ func _ready() -> void:
 	_onglet_trait()
 	_onglet_couleurs()
 	_onglet_lumiere()
+	_onglet_mouvement()
 	_onglet_relief()
 	_onglet_monde()
 	_onglet_creations()
@@ -187,11 +189,29 @@ func _page(titre: String) -> VBoxContainer:
 
 
 func _titre(parent: Control, texte: String) -> void:
+	if parent.get_child_count() > 0:
+		var esp: Control = Control.new()
+		esp.custom_minimum_size = Vector2(0, 12)
+		esp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		parent.add_child(esp)
+	var h: HBoxContainer = HBoxContainer.new()
+	h.add_theme_constant_override("separation", 14)
+	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	h.set_meta("titre", texte)
+	parent.add_child(h)
+	var barre: ColorRect = ColorRect.new()
+	barre.color = Color(0.35, 0.8, 1.0)
+	barre.custom_minimum_size = Vector2(7, 36)
+	barre.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	barre.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	barre.add_to_group("barres_titre")
+	h.add_child(barre)
 	var l: Label = Label.new()
 	l.text = texte
 	l.add_theme_font_size_override("font_size", 32)
 	l.add_theme_color_override("font_color", Color(0.55, 0.75, 1.0))
-	parent.add_child(l)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	h.add_child(l)
 
 
 func _note(parent: Control, texte: String) -> void:
@@ -293,6 +313,9 @@ func rafraichir() -> void:
 	if _grilles_genres.size() > 0:
 		for f in _grilles_genres.size():
 			(_grilles_genres[f] as Control).visible = (f == _famille)
+	if _desc_mouv != null:
+		var mv: int = clampi(app.sc.mouvement, 0, DESC_MOUVEMENTS.size() - 1)
+		_desc_mouv.text = str(Tables.NOMS_MOUVEMENTS[mv]) + " : " + str(DESC_MOUVEMENTS[mv])
 
 
 func message(t: String) -> void:
@@ -508,12 +531,40 @@ func _onglet_relief() -> void:
 	_curseur(p, "rel_h", "Hauteur du relief", 0.1, 1.2, 0.01, func() -> float: return app.sc.rel_h, func(v: float) -> void: app.set_relief_h(v))
 	_curseur(p, "rel_lum", "Ombrage du relief", 0.0, 1.0, 0.01, func() -> float: return app.sc.rel_lum, func(v: float) -> void: app.set_relief_lum(v))
 	_note(p, "Le relief est vraiment en 3D : tu peux voler au-dessus, autour et dedans avec le joystick.")
-	_titre(p, "Mouvement (10)")
-	_grille(p, "mouvement", Tables.NOMS_MOUVEMENTS, 5, func() -> int: return app.sc.mouvement, func(i: int) -> void: app.set_mouvement(i))
+	_bascule(p, "sol", "Grille au sol", func() -> bool: return app.sol_visible, func(on: bool) -> void: app.set_sol(on))
+
+
+# ------------------------------------------------------- onglet mouvement
+
+const DESC_MOUVEMENTS: Array = [
+	"Le mandala reste immobile.",
+	"Tout tourne lentement dans un sens.",
+	"Les calques tournent en sens contraires.",
+	"Chaque calque tourne plus vite que le precedent.",
+	"Les calques gonflent et se retirent doucement.",
+	"Un va-et-vient doux, comme un pendule.",
+	"Tous les calques tournent ensemble.",
+	"Un tunnel sans fin qui t'attire vers le centre.",
+	"Le tunnel inverse : le centre s'ouvre devant toi.",
+	"Un rythme interne qui pulse par a-coups.",
+]
+
+
+func _onglet_mouvement() -> void:
+	var p: VBoxContainer = _page("Mouvement")
+	_titre(p, "Faire bouger les structures")
+	_note(p, "Choisis comment le mandala s'anime. Le trait que tu dessines suit le mouvement.")
+	_grille(p, "mouvement", Tables.NOMS_MOUVEMENTS, 5, func() -> int: return app.sc.mouvement, func(i: int) -> void: app.set_mouvement(i), 84)
+	_desc_mouv = Label.new()
+	_desc_mouv.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_desc_mouv.add_theme_font_size_override("font_size", 26)
+	_desc_mouv.add_theme_color_override("font_color", Color(0.85, 0.92, 1.0))
+	p.add_child(_desc_mouv)
+	_titre(p, "Rythme")
 	_curseur(p, "vitesse", "Vitesse", 0.1, 3.0, 0.05, func() -> float: return app.sc.vitesse, func(v: float) -> void: app.set_vitesse(v))
 	_bascule(p, "anime", "Animation en marche", func() -> bool: return app.sc.anime, func(on: bool) -> void: app.sc.anime = on)
-	_bascule(p, "sol", "Grille au sol", func() -> bool: return app.sol_visible, func(on: bool) -> void: app.set_sol(on))
-	_note(p, "Musique : sans micro dans cette version, le mouvement suit un rythme interne.")
+	_bascule(p, "souffle_m", "Le mandala respire (meditation)", func() -> bool: return app.sc.souffle, func(on: bool) -> void: app.set_souffle(on))
+	_note(p, "Astuce : clic du joystick gauche = pause / reprise de l'animation. Musique : sans micro, le mouvement suit un rythme interne.")
 
 
 # -------------------------------------------------------- onglet creations

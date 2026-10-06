@@ -99,7 +99,7 @@ func additif() -> bool:
 
 
 func _maj_adapt() -> void:
-	adapt = clampf(1.0 / (1.0 + 0.55 * couverture), 0.05, 1.0)
+	adapt = clampf(1.0 / (1.0 + 1.2 * couverture), 0.05, 1.0)
 	appliquer_fx()
 
 
