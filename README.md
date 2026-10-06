@@ -16,6 +16,7 @@ Version Meta Quest 3 de Mandala Studio (Godot 4.6 + OpenXR). Version 4 : 4 nouve
 
 - Modèles en un clic : Matrix, Pluie Matrix, Vitrail, Rosace de vitrail, Smiley, Guirlande de smileys, Semis de smileys, Smileys sans fin, plus les 14 scènes livrées.
 - 11 mondes autour de toi : nuit étoilée, nébuleuse, aurore boréale, abysses, crépuscule, code Matrix, cathédrale (rayons de lumière), lucioles, volcan, glacier, rêve rose, avec de la poussière lumineuse qui flotte.
+- Respiration : onglet Monde, le mandala gonfle et se retire doucement pour méditer (durée réglable).
 - Dôme : le mandala se plaque sur une voûte autour de toi, tu es au centre et tu dessines sur la voûte. Onglet Monde : Plan / Dôme, ouverture réglable, recentrage.
 - Sons du téléphone : 5 ambiances, notes pendant le tracé (5 gammes), jingle de démarrage. Les manettes vibrent quand tu dessines et quand tu cliques dans le menu.
 

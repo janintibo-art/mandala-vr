@@ -627,10 +627,23 @@ func zoom_calque(k: int) -> float:
 	return 1.0
 
 
+## Respiration : le mandala gonfle et se vide doucement (meditation).
+var souffle: bool = false
+var souffle_periode: float = 10.0
+var _souffle_t: float = 0.0
+
+
+func facteur_souffle() -> float:
+	if not souffle:
+		return 1.0
+	return 1.0 + 0.07 * sin(_souffle_t * TAU / maxf(souffle_periode, 2.0))
+
+
 func appliquer_pivots() -> void:
+	var fs: float = facteur_souffle()
 	for k in 3:
 		var p: Node3D = pivots[k]
-		var z: float = zoom_calque(k)
+		var z: float = zoom_calque(k) * fs
 		p.rotation = Vector3(0.0, 0.0, -angle_calque(k))
 		p.scale = Vector3(z, z, z)
 
@@ -641,6 +654,8 @@ func _process(dt: float) -> void:
 		appliquer_fx()
 	if anime:
 		temps += dt
+	if souffle:
+		_souffle_t += dt
 	appliquer_pivots()
 	_live_chrono += dt
 	_maj_live(false)

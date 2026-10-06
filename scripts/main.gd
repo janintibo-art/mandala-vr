@@ -378,6 +378,13 @@ func preset_fx(nom: String) -> void:
 	_prefs_a_sauver()
 
 
+func set_souffle(actif_: bool) -> void:
+	sc.souffle = actif_
+	if not actif_:
+		sc.appliquer_pivots()
+	message("Respiration : " + ("oui" if actif_ else "non"))
+
+
 func set_monde(i: int) -> void:
 	monde.appliquer(i)
 	sc.ciel = i > 0
