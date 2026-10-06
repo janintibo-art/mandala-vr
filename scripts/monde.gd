@@ -2,7 +2,7 @@ class_name Monde
 extends Node3D
 ## Decor immersif : ciel procedural autour de toi + poussiere lumineuse.
 
-const NOMS: Array = ["Aucun", "Nuit etoilee", "Nebuleuse", "Aurore boreale", "Abysses", "Crepuscule", "Code", "Cathedrale"]
+const NOMS: Array = ["Aucun", "Nuit etoilee", "Nebuleuse", "Aurore boreale", "Abysses", "Crepuscule", "Code", "Cathedrale", "Lucioles", "Volcan", "Glacier", "Reve rose"]
 
 # haut, bas, etoiles, neb, n1, n2, aurore, pluie, rayons, horizon, couleur horizon, poussiere(couleur, alpha, derive, taille)
 const DEF: Array = [
@@ -14,6 +14,10 @@ const DEF: Array = [
 	{"haut": Color(0.08, 0.04, 0.22), "bas": Color(0.55, 0.2, 0.25), "etoiles": 0.35, "horizon": 0.9, "hcol": Color(1.0, 0.45, 0.2), "p": [Color(1.0, 0.8, 0.6), 0.4, Vector3(0, 0.02, 0), 0.9]},
 	{"haut": Color(0.0, 0.02, 0.0), "bas": Color(0.0, 0.05, 0.02), "etoiles": 0.0, "pluie": 1.0, "p": [Color(0.3, 1.0, 0.5), 0.5, Vector3(0, -0.4, 0), 0.8]},
 	{"haut": Color(0.03, 0.01, 0.06), "bas": Color(0.16, 0.08, 0.03), "etoiles": 0.3, "rayons": 1.0, "horizon": 0.4, "hcol": Color(0.9, 0.55, 0.2), "p": [Color(1.0, 0.85, 0.5), 0.6, Vector3(0, 0.03, 0), 1.2]},
+	{"haut": Color(0.0, 0.03, 0.02), "bas": Color(0.01, 0.07, 0.03), "etoiles": 0.25, "p": [Color(0.8, 1.0, 0.4), 1.0, Vector3(0.0, 0.05, 0.0), 1.6]},
+	{"haut": Color(0.06, 0.0, 0.0), "bas": Color(0.35, 0.07, 0.0), "etoiles": 0.0, "horizon": 1.0, "hcol": Color(1.0, 0.3, 0.05), "p": [Color(1.0, 0.5, 0.15), 0.8, Vector3(0.0, 0.3, 0.0), 1.1]},
+	{"haut": Color(0.02, 0.06, 0.12), "bas": Color(0.15, 0.3, 0.4), "etoiles": 0.5, "aurore": 0.6, "p": [Color(0.85, 0.95, 1.0), 0.7, Vector3(0.02, -0.12, 0.0), 1.0]},
+	{"haut": Color(0.2, 0.08, 0.3), "bas": Color(0.5, 0.2, 0.4), "etoiles": 0.2, "neb": 0.7, "n1": Color(1.0, 0.4, 0.7), "n2": Color(0.5, 0.5, 1.0), "p": [Color(1.0, 0.8, 0.95), 0.6, Vector3(0.0, 0.04, 0.0), 1.3]},
 ]
 
 var camera: Node3D = null
