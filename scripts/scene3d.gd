@@ -25,6 +25,7 @@ var ciel: bool = false
 var dome: float = 0.0
 var dome_cible: float = 0.0
 var dome_ang: float = 1.9
+var dome_fold: float = 0.0
 var dome_r: float = 7.0
 var dome_c: Vector3 = Vector3(0.0, 1.6, 0.0)
 var dome_b: Basis = Basis()
@@ -114,6 +115,7 @@ func appliquer_fx() -> void:
 		sm.set_shader_parameter("dome_c", dome_c)
 		sm.set_shader_parameter("dome_r", dome_r)
 		sm.set_shader_parameter("dome_ang", dome_ang)
+		sm.set_shader_parameter("dome_fold", dome_fold)
 		sm.set_shader_parameter("dome_b", dome_b)
 		sm.set_shader_parameter("halo", float(fx["halo"]))
 		sm.set_shader_parameter("coeur", float(fx["coeur"]))
@@ -510,7 +512,11 @@ func regler_dome(actif_: bool, cam_pos: Vector3, yaw: float, recentrer: bool = t
 
 
 func dome_map(rel: Vector3) -> Vector3:
-	var th: float = minf(Vector2(rel.x, rel.y).length() / (RM * PX) * dome_ang, 3.0)
+	var th: float = Vector2(rel.x, rel.y).length() / (RM * PX) * dome_ang
+	if dome_fold > 0.5:
+		th = PI - absf(fposmod(th, TAU) - PI)
+	else:
+		th = minf(th, 3.0)
 	var ph: float = atan2(rel.y, rel.x)
 	var d: Vector3 = Vector3(sin(th) * cos(ph), sin(th) * sin(ph), -cos(th))
 	return dome_c + (dome_b * d) * (dome_r + rel.z)

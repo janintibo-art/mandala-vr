@@ -22,6 +22,11 @@ uniform float v14_depth = 0.52;
 uniform float v14_spark = 0.28;
 uniform float v14_speed = 0.85;
 
+// Mandala VR v25 : eclat sous le regard.
+uniform vec3 regard_pos = vec3(0.0);
+uniform float regard_force = 0.0;
+uniform float regard_r = 1.2;
+
 vec3 decaler_teinte(vec3 c, float a) {
 	const mat3 yiq = mat3(vec3(0.299, 0.596, 0.211), vec3(0.587, -0.274, -0.523), vec3(0.114, -0.322, 0.312));
 	const mat3 rgb = mat3(vec3(1.0, 1.0, 1.0), vec3(0.956, -0.272, -1.106), vec3(0.621, -0.647, 1.703));
@@ -154,6 +159,10 @@ vec3 effets_couleur(vec3 c, float noyau, float bord, vec3 wp) {
 	}
 	c = mix(c, vec3(1.0), coeur * noyau * 0.65);
 	c = v12_finition(c * g, noyau, wp);
+	if (regard_force > 0.001) {
+		float dg = distance(wp, regard_pos) / max(regard_r, 0.05);
+		c *= 1.0 + regard_force * exp(-dg * dg);
+	}
 	return v14_materiau(c, noyau, bord, wp);
 }
 
@@ -166,11 +175,17 @@ uniform float dome = 0.0;
 uniform vec3 dome_c = vec3(0.0);
 uniform float dome_r = 7.0;
 uniform float dome_ang = 1.9;
+uniform float dome_fold = 0.0;
 uniform mat3 dome_b;
 
 vec3 dome_map(vec3 rel) {
 	float r = length(rel.xy);
-	float th = min(r / 6.0 * dome_ang, 3.0);
+	float th = r / 6.0 * dome_ang;
+	if (dome_fold > 0.5) {
+		th = 3.14159265 - abs(mod(th, 6.2831853) - 3.14159265);
+	} else {
+		th = min(th, 3.0);
+	}
 	float ph = atan(rel.y, rel.x);
 	vec3 d = vec3(sin(th) * cos(ph), sin(th) * sin(ph), -cos(th));
 	return dome_c + (dome_b * d) * (dome_r + rel.z);
