@@ -31,6 +31,19 @@ static func lister() -> Array:
 				continue
 			var txt: String = FileAccess.get_file_as_string(dossier + "/" + nom_f)
 			var j: Variant = JSON.parse_string(txt)
+			var origine: String = "mes creations" if pref == "u:" else "livree"
+			if j is Array:
+				var lot: Array = j
+				for k in lot.size():
+					if lot[k] is Dictionary:
+						var jk: Dictionary = lot[k]
+						out.append({
+							"id": pref + nom_f + "#" + str(k),
+							"nom": str(jk.get("nom", "Sans titre")),
+							"date": int(jk.get("date", 0)),
+							"origine": "telephone",
+						})
+				continue
 			if not (j is Dictionary):
 				continue
 			var jd: Dictionary = j
@@ -38,20 +51,31 @@ static func lister() -> Array:
 				"id": pref + nom_f,
 				"nom": str(jd.get("nom", "Sans titre")),
 				"date": int(jd.get("date", 0)),
-				"origine": "mes creations" if pref == "u:" else "livree",
+				"origine": origine,
 			})
 	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["date"]) > int(b["date"]))
 	return out
 
 
 static func _chemin(id: String) -> String:
+	var reste: String = id.substr(2).get_slice("#", 0)
 	if id.begins_with("r:"):
-		return LIVREES + "/" + id.substr(2)
-	return DOSSIER + "/" + id.substr(2)
+		return LIVREES + "/" + reste
+	return DOSSIER + "/" + reste
 
 
+## Un fichier peut etre un lot (tableau) exporte du telephone : id "r:fichier.json#3".
 static func lire(id: String) -> String:
-	return FileAccess.get_file_as_string(_chemin(id))
+	var txt: String = FileAccess.get_file_as_string(_chemin(id))
+	if id.contains("#"):
+		var j: Variant = JSON.parse_string(txt)
+		var k: int = int(id.get_slice("#", 1))
+		if j is Array:
+			var lot: Array = j
+			if k >= 0 and k < lot.size():
+				return JSON.stringify(lot[k])
+		return ""
+	return txt
 
 
 static func ecrire(contenu: String) -> String:
@@ -66,7 +90,7 @@ static func ecrire(contenu: String) -> String:
 
 
 static func supprimer(id: String) -> void:
-	if id.begins_with("u:"):
+	if id.begins_with("u:") and not id.contains("#"):
 		DirAccess.remove_absolute(_chemin(id))
 
 

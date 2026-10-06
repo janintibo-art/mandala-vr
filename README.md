@@ -40,3 +40,8 @@ L'onglet Trait propose Éco / Normal / Maximum. Le nombre d'éléments est limit
 ## Compilation
 
 L'APK se compile sur GitHub (onglet Actions) et se publie dans Releases sous le nom `derniere-version`.
+
+## Importer les creations du telephone (v5)
+1. Telephone (appli v36) : Bibliotheque, icone VR en haut, puis enregistrer le fichier `mandala_vr_creations.json` (par exemple vers Termux ou Telechargements).
+2. Termux : copier ce fichier dans `mandala_vr/creations/`, puis lancer la mise a jour habituelle.
+3. Dans le casque, onglet Creations : elles apparaissent avec la mention (telephone).
