@@ -11,7 +11,7 @@ void vertex() {
 	}
 	wpos = wc;
 	float sc = length(MODEL_MATRIX[0].xyz);
-	float el = 1.0 + halo * 1.5;
+	float el = 1.0 + halo * 1.65;
 	vec3 vc = (VIEW_MATRIX * vec4(wc, 1.0)).xyz;
 	vc.xy += UV * UV2.x * el * sc;
 	VERTEX = vc;
@@ -19,16 +19,18 @@ void vertex() {
 
 void fragment() {
 	float r = length(UV);
-	if (r > 1.0) {
+	float aa = max(fwidth(r) * (1.5 / max(v12_finesse, 0.55)), 0.0015);
+	if (r > 1.0 + aa) {
 		discard;
 	}
-	float el = 1.0 + halo * 1.5;
+	float el = 1.0 + halo * 1.65;
 	float cr = 1.0 / el;
-	float noyau = 1.0 - smoothstep(cr * 0.6, cr, r);
-	float bord = 1.0 - r;
-	float lueur = bord * bord * min(halo, 1.0) * 0.7;
+	float noyau = 1.0 - smoothstep(cr * 0.56 - aa, cr + aa, r);
+	float doux = 1.0 - smoothstep(0.30, 1.0 + aa, r);
+	float lueur = doux * doux * min(halo, 1.0) * (0.50 + v12_profondeur * 0.20);
 	float a = max(noyau, lueur);
 	vec3 c = effets_couleur(COLOR.rgb, noyau, wpos);
-	ALBEDO = min(c * 0.9, vec3(1.0));
-	ALPHA = clamp(a * COLOR.a * 1.4, 0.0, 1.0);
+	c *= 0.88 + noyau * v12_brillance * 0.18;
+	ALBEDO = min(c, vec3(1.35));
+	ALPHA = clamp(a * COLOR.a * 1.38, 0.0, 1.0);
 }
