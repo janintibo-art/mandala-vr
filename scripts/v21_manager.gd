@@ -170,12 +170,24 @@ func _ajouter_mouvement(p: VBoxContainer) -> void:
 	_gros(g, "Animer / Pause", _anim_bascule)
 	_gros(g, "Moins vite", _vitesse.bind(0.8))
 	_gros(g, "Plus vite", _vitesse.bind(1.25))
+	app.panneau._titre(p, "Dome aleatoire")
+	var note: Label = Label.new()
+	note.text = "Les scenes s'enchainent toutes seules, autour de toi, avec du mouvement. Duree par scene : onglet Diapo."
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	note.add_theme_font_size_override("font_size", 23)
+	p.add_child(note)
+	var g2: GridContainer = GridContainer.new()
+	g2.columns = 2
+	g2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	p.add_child(g2)
+	_gros(g2, "Lancer le dome aleatoire", func() -> void: app.dome_aleatoire_lancer())
+	_gros(g2, "Arreter", func() -> void: app.diff_stop())
 	if cible >= 0:
 		var k: int = 0
 		while p.get_child_count() > n0 + k:
 			p.move_child(p.get_child(n0 + k), cible + k)
 			k += 1
-			if k > 8:
+			if k > 16:
 				break
 
 

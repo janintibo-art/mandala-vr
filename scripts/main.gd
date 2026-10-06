@@ -679,7 +679,29 @@ func seance_meditation() -> void:
 	message("Seance de meditation")
 
 
+## Mode aleatoire : scenes qui s'enchainent, toujours en dome et en mouvement.
+var dome_alea: bool = false
+
+
+func dome_aleatoire_lancer() -> void:
+	dome_alea = true
+	vizu_lancer()
+	message("Dome aleatoire")
+
+
+func _forcer_dome_mouvement() -> void:
+	sc.regler_dome(true, camera.global_position, _yaw_camera())
+	sol.visible = false
+	if sc.mouvement == 0:
+		sc.mouvement = rng.randi_range(1, Tables.NOMS_MOUVEMENTS.size() - 1)
+	sc.vitesse = clampf(sc.vitesse, 0.4, 1.2)
+	sc.anime = true
+	_maj_boucle()
+	panneau.rafraichir()
+
+
 func diff_stop() -> void:
+	dome_alea = false
 	if _vizu_avant >= 0.0:
 		vizu_duree = _vizu_avant
 		_vizu_avant = -1.0
@@ -717,6 +739,8 @@ func _diff_charger_suivant() -> void:
 	if _diff_vizu:
 		var c: Dictionary = Generateur.tirage(rng, "Vizu", true)
 		_appliquer_config(c)
+		if dome_alea:
+			_forcer_dome_mouvement()
 		_diff_dur = vizu_duree
 		_diff_i += 1
 		return
