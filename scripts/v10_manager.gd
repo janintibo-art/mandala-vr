@@ -352,5 +352,5 @@ func _maj_etat(dt: float) -> void:
 	var son_nom: String = str(Son.NOMS_AMBIANCES[clampi(app.son.ambiance, 0, Son.NOMS_AMBIANCES.size() - 1)])
 	var vit: float = float(v8.get("_vitesse_mult"))
 	var tel: bool = bool(v8.get("_teleportation"))
-	var pass: bool = bool(v8.get("_passthrough"))
-	_etat_label.text = "%s | Monde : %s | Son : %s\nVitesse x%.2f | Teleportation : %s | %s" % [mains, monde_nom, son_nom, vit, "oui" if tel else "non", "Passthrough" if pass else "VR"]
+	var en_passthrough: bool = bool(v8.get("_passthrough"))
+	_etat_label.text = "%s | Monde : %s | Son : %s\nVitesse x%.2f | Teleportation : %s | %s" % [mains, monde_nom, son_nom, vit, "oui" if tel else "non", "Passthrough" if en_passthrough else "VR"]

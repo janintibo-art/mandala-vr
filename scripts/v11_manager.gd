@@ -140,8 +140,8 @@ func _installer_ui(p: VBoxContainer) -> void:
 
 	app.panneau._titre(p, "Gestes mains securises")
 	app.panneau._note(p,
-		"Main droite fermee 0,8 s : Annuler.  Main gauche fermee 0,8 s : Recentrer.  "
-		"Deux mains fermees 1,2 s : Pause / reprise animation.  "
+		"Main droite fermee 0,8 s : Annuler.  Main gauche fermee 0,8 s : Recentrer.  " +
+		"Deux mains fermees 1,2 s : Pause / reprise animation.  " +
 		"Le pincement droit continue de dessiner et le pincement gauche maintenu ouvre le menu.")
 
 	_session_label = Label.new()

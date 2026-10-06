@@ -39,10 +39,10 @@ func _process(dt: float) -> void:
 		return
 
 	var monde_i: int = app.monde.courant
-	var pass: bool = v8 != null and bool(v8.get("_passthrough"))
-	if monde_i != _monde_avant or pass != _passthrough_avant:
+	var en_passthrough: bool = v8 != null and bool(v8.get("_passthrough"))
+	if monde_i != _monde_avant or en_passthrough != _passthrough_avant:
 		_monde_avant = monde_i
-		_passthrough_avant = pass
+		_passthrough_avant = en_passthrough
 		_appliquer_monde()
 
 	_etat_t -= dt
@@ -206,7 +206,7 @@ func _appliquer_monde() -> void:
 	if app.monde == null:
 		return
 	var i: int = clampi(app.monde.courant, 0, Monde.NOMS.size() - 1)
-	var pass: bool = v8 != null and bool(v8.get("_passthrough"))
+	var en_passthrough: bool = v8 != null and bool(v8.get("_passthrough"))
 
 	if app.monde.m_ciel != null:
 		app.monde.m_ciel.set_shader_parameter("v13_monde", i)
@@ -218,14 +218,14 @@ func _appliquer_monde() -> void:
 		app.monde.m_pous.set_shader_parameter("v13_intensite", _intensite if _actif else 0.0)
 		app.monde.m_pous.set_shader_parameter("v13_vitesse", _vitesse)
 
-	_appliquer_brouillard(i, pass)
+	_appliquer_brouillard(i, en_passthrough)
 
 
-func _appliquer_brouillard(i: int, pass: bool) -> void:
+func _appliquer_brouillard(i: int, en_passthrough: bool) -> void:
 	if app.env == null:
 		return
 
-	if pass or not _actif or not _brouillard or i <= 0:
+	if en_passthrough or not _actif or not _brouillard or i <= 0:
 		app.env.fog_enabled = false
 		return
 

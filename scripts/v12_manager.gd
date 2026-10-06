@@ -45,9 +45,9 @@ func _process(dt: float) -> void:
 			_installer()
 		return
 
-	var pass: bool = v8 != null and bool(v8.get("_passthrough"))
-	if pass != _passthrough_avant:
-		_passthrough_avant = pass
+	var en_passthrough: bool = v8 != null and bool(v8.get("_passthrough"))
+	if en_passthrough != _passthrough_avant:
+		_passthrough_avant = en_passthrough
 		_appliquer_environnement()
 
 	_etat_t -= dt
@@ -281,7 +281,7 @@ func _appliquer_viewport() -> void:
 func _appliquer_environnement() -> void:
 	if app.env == null:
 		return
-	var pass: bool = v8 != null and bool(v8.get("_passthrough"))
+	var en_passthrough: bool = v8 != null and bool(v8.get("_passthrough"))
 
 	app.env.tonemap_mode = Environment.TONE_MAPPER_ACES
 	app.env.tonemap_exposure = _exposition
@@ -293,7 +293,7 @@ func _appliquer_environnement() -> void:
 	app.env.adjustment_saturation = _saturation
 
 	# En realite mixte on coupe le bloom pour garder une camera propre.
-	app.env.glow_enabled = _glow and not pass
+	app.env.glow_enabled = _glow and not en_passthrough
 	app.env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SCREEN
 	app.env.glow_hdr_threshold = 0.88
 	app.env.glow_hdr_scale = 1.35
