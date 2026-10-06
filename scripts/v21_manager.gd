@@ -3,11 +3,11 @@ extends Node
 ## Mandala VR v21 : menu reorganise en onglets thematiques,
 ## acces direct au mouvement et barres d'accent assorties au theme.
 
-const ORDRE: Array = ["Rapide", "Modeles", "Genres", "Trait", "Couleurs", "Lumiere", "Mouvement", "Relief", "Monde", "Style", "Creations", "Diffusion", "V8"]
+const ORDRE: Array = ["Rapide", "Modeles", "Genres", "Trait", "Couleurs", "Lumiere", "Mouvement", "Relief", "Monde", "Sensations", "Style", "Creations", "Diffusion", "V8"]
 const TITRES: Dictionary = {
 	"Rapide": "Accueil", "Modeles": "Modeles", "Genres": "Formes", "Trait": "Trait",
-	"Couleurs": "Couleurs", "Lumiere": "Lumiere", "Mouvement": "Mouvement", "Relief": "Relief",
-	"Monde": "Monde", "Style": "Style", "Creations": "Galerie", "Diffusion": "Diapo", "V8": "Reglages",
+	"Couleurs": "Couleurs", "Lumiere": "Lumiere", "Mouvement": "Bouger", "Relief": "Relief",
+	"Monde": "Monde", "Sensations": "Vertige", "Style": "Style", "Creations": "Galerie", "Diffusion": "Diapo", "V8": "Options",
 }
 const VERS_MONDE: Array = ["Mondes cinematographiques"]
 const VERS_STYLE: Array = ["Style du mandala", "Aura et orbites du mandala", "Profondeur 3D du mandala", "Visuel reactif", "Transitions visuelles premium"]
@@ -39,7 +39,7 @@ func _process(dt: float) -> void:
 		if app.panneau == null or app.sc == null:
 			return
 		var pret: bool = v19 != null and v19.get("_installe") == true
-		for nom in ["V10Manager", "V11Manager", "V12Manager", "V13Manager", "V14Manager", "V15Manager", "V16Manager", "V17Manager", "V18Manager"]:
+		for nom in ["V10Manager", "V11Manager", "V12Manager", "V13Manager", "V14Manager", "V15Manager", "V16Manager", "V17Manager", "V18Manager", "V23Manager"]:
 			var mg: Node = app.get_node_or_null(nom)
 			if mg != null and mg.get("_installe") != true:
 				pret = false
