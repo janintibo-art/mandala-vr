@@ -33,9 +33,10 @@ void fragment() {
 	float noyau = 1.0 - smoothstep(cr * 0.52 - aa, cr + aa, x);
 	float doux = 1.0 - smoothstep(0.48 - aa, 1.0, x);
 	float lueur = doux * doux * min(halo, 1.0) * (0.40 + v12_profondeur * 0.18);
-	float a = max(noyau, lueur);
-	vec3 c = effets_couleur(COLOR.rgb, noyau, wpos);
+	float couches = v14_halo_mult(x, cr);
+	float a = max(noyau, lueur) + couches * 0.75;
+	vec3 c = effets_couleur(COLOR.rgb, noyau, doux, wpos);
 	c *= 0.88 + noyau * v12_brillance * 0.16;
-	ALBEDO = min(c, vec3(1.35));
+	ALBEDO = min(c, vec3(1.45));
 	ALPHA = clamp(a * COLOR.a * 1.38, 0.0, 1.0);
 }

@@ -28,8 +28,9 @@ void fragment() {
 	float noyau = 1.0 - smoothstep(cr * 0.56 - aa, cr + aa, r);
 	float doux = 1.0 - smoothstep(0.30, 1.0 + aa, r);
 	float lueur = doux * doux * min(halo, 1.0) * (0.55 + v12_profondeur * 0.22);
-	float a = max(noyau, lueur);
-	vec3 c = effets_couleur(COLOR.rgb, noyau, wpos);
+	float couches = v14_disque_halo(r, cr);
+	float a = max(noyau, lueur) + couches;
+	vec3 c = effets_couleur(COLOR.rgb, noyau, doux, wpos);
 	float coeur_plus = 1.0 + noyau * v12_brillance * 0.65;
 	ALBEDO = c * gain_eff() * a * COLOR.a * coeur_plus;
 }
