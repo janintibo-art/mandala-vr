@@ -28,6 +28,8 @@ var _famille: int = 0
 var _grilles_genres: Array = []
 var _liste_choisie: int = 0
 var _desc_mouv: Label = null
+var _vignettes: Array = []
+var _pal_vignettes: int = -1
 
 
 class Pastille extends Button:
@@ -49,6 +51,194 @@ class Pastille extends Button:
 			draw_rect(Rect2(Vector2(1, 1), size - Vector2(2, 2)), Color(1, 1, 1, 1), false, 4.0)
 		elif is_hovered():
 			draw_rect(Rect2(Vector2(1, 1), size - Vector2(2, 2)), Color(1, 1, 1, 0.5), false, 2.0)
+
+
+class Vignette extends Button:
+	## Vignette d'un genre : petit dessin stylise (symetrie 8 branches) dans la palette courante.
+	var genre: int = 0
+	var appli: Node = null
+
+	static func _base(disp: int) -> PackedVector2Array:
+		var out: PackedVector2Array = PackedVector2Array()
+		var n: int = 15
+		for i in n:
+			var u: float = float(i) / float(n - 1)
+			var r: float = 0.16 + u * 0.78
+			var a: float = -0.55 + sin(u * PI) * 0.62
+			match disp:
+				2:
+					r = 0.10 + u * 0.86
+					a = u * 2.5 - 0.3
+				3:
+					r = 0.22 + pow(1.0 - u, 2.0) * 0.72
+					a = -0.5 + sin(u * PI) * 0.7
+				5:
+					r = 0.14 + u * 0.82
+					a = (0.30 if i % 2 == 0 else -0.30) * (1.0 - u * 0.5)
+				6:
+					a = 0.0
+				8, 9:
+					r = 0.16 + u * 0.55
+					a = -0.3 + sin(u * PI) * 0.5
+			out.append(Vector2(cos(a), sin(a)) * r)
+		return out
+
+	func _decor(pts: PackedVector2Array, decor: int, col: Color, k: int) -> void:
+		var n: int = pts.size()
+		match decor:
+			1, 5:
+				for i in range(1, n, 2):
+					draw_circle(pts[i], 3.6 if decor == 1 else 2.2, col)
+			2:
+				for i in range(1, n):
+					var d: Vector2 = (pts[i] - pts[i - 1]).normalized().orthogonal() * 5.0
+					draw_line(pts[i] - d, pts[i] + d, col, 1.8)
+			3:
+				for sgn in [-1.0, 1.0]:
+					var dec: PackedVector2Array = PackedVector2Array()
+					for i in n:
+						var nn: Vector2 = Vector2.ZERO
+						if i < n - 1:
+							nn = (pts[i + 1] - pts[i]).normalized().orthogonal()
+						else:
+							nn = (pts[i] - pts[i - 1]).normalized().orthogonal()
+						dec.append(pts[i] + nn * 3.2 * float(sgn))
+					draw_polyline(dec, col, 1.6, true)
+			4:
+				for i in n:
+					for j in 3:
+						var o: Vector2 = Vector2(sin(float(i * 7 + j * 3 + k)), cos(float(i * 5 + j * 11 + k))) * 5.0
+						draw_circle(pts[i] + o, 1.4, col)
+			6:
+				draw_polyline(pts, Color(col.r, col.g, col.b, 0.65), 7.0, true)
+				draw_polyline(pts, col.lightened(0.3), 1.6, true)
+			7:
+				for i in range(1, n):
+					var t: Vector2 = (pts[i] - pts[i - 1]).normalized()
+					var d2: Vector2 = t.rotated(1.0) * 6.0
+					draw_line(pts[i], pts[i] + d2, col, 1.4)
+					draw_line(pts[i], pts[i] + t.rotated(-1.0) * 6.0, col, 1.4)
+				draw_polyline(pts, col, 1.4, true)
+			8:
+				draw_polyline(pts, Color(col.r, col.g, col.b, 0.28), 10.0, true)
+				draw_polyline(pts, col.lightened(0.25), 1.8, true)
+			9:
+				for i in range(1, n, 2):
+					var p: Vector2 = pts[i]
+					draw_colored_polygon(PackedVector2Array([p + Vector2(0, -5), p + Vector2(4, 0), p + Vector2(0, 5), p + Vector2(-4, 0)]), col)
+			10:
+				for i in range(1, n, 2):
+					draw_arc(pts[i], 2.5 + float(i % 4) * 1.5, 0.0, TAU, 12, col, 1.5)
+			11:
+				draw_polyline(pts, col.darkened(0.35), 7.0, true)
+				draw_polyline(pts, col, 4.0, true)
+				draw_polyline(pts, Color(1, 1, 1, 0.55), 1.2, true)
+			12:
+				for j in 3:
+					var dd: PackedVector2Array = PackedVector2Array()
+					for i in n:
+						dd.append(pts[i] + Vector2(sin(float(i + j * 3)), cos(float(i * 2 + j))) * 2.6)
+					draw_polyline(dd, col, 1.1, true)
+			13:
+				for i in range(1, n, 3):
+					var q: Vector2 = pts[i]
+					draw_rect(Rect2(q - Vector2(3.5, 3.5), Vector2(7, 7)), col, false, 1.6)
+					draw_circle(q, 1.5, col)
+			14:
+				for i in range(1, n):
+					draw_rect(Rect2(pts[i] - Vector2(2.2, 2.2), Vector2(4.4, 4.4)), col)
+			15:
+				draw_polyline(pts, col, 7.0, true)
+				draw_polyline(pts, Color(0.05, 0.05, 0.08), 1.6, true)
+			16:
+				var cc: PackedVector2Array = PackedVector2Array()
+				for i in n:
+					cc.append(pts[i])
+					if i < n - 1 and i % 2 == 0:
+						cc.append(Vector2(pts[i + 1].x, pts[i].y))
+				draw_polyline(cc, col, 1.8, true)
+				for i in range(0, n, 3):
+					draw_circle(pts[i], 2.6, col)
+			17:
+				var h2: PackedVector2Array = PackedVector2Array()
+				for i in n:
+					var nn2: Vector2 = Vector2(0, 1)
+					if i < n - 1:
+						nn2 = (pts[i + 1] - pts[i]).normalized().orthogonal()
+					h2.append(pts[i] + nn2 * sin(float(i) * 1.1) * 4.0)
+				draw_polyline(h2, col, 1.8, true)
+				draw_polyline(pts, Color(col.r, col.g, col.b, 0.5), 1.2, true)
+			18:
+				draw_polyline(pts, col, 1.4, true)
+				for i in range(2, n, 2):
+					var t2: Vector2 = (pts[i] - pts[i - 1]).normalized()
+					draw_line(pts[i], pts[i] + t2.rotated(1.05) * 6.0, col, 1.2)
+					draw_line(pts[i], pts[i] + t2.rotated(-1.05) * 6.0, col, 1.2)
+			19:
+				draw_polyline(pts, Color(col.r, col.g, col.b, 0.35), 1.0, true)
+				for i in range(1, n, 3):
+					draw_circle(pts[i], 3.0, Color(1, 1, 1, 0.9))
+					draw_circle(pts[i], 5.0, Color(col.r, col.g, col.b, 0.35))
+			_:
+				draw_polyline(pts, col, 2.4, true)
+
+	func _draw() -> void:
+		if appli == null:
+			return
+		var g: Array = Tables.GENRES[clampi(genre, 0, Tables.GENRES.size() - 1)]
+		var disp: int = int(g[1])
+		var decor: int = int(g[2])
+		var mir: bool = bool(g[3])
+		var pal: int = clampi(int(appli.reg.palette), 0, Tables.palettes.size() - 1)
+		var cols: PackedColorArray = Tables.palettes[pal]["cols"]
+		if cols.size() == 0:
+			cols = PackedColorArray([Color.WHITE])
+		var ctr: Vector2 = Vector2(size.x * 0.5, size.y * 0.42)
+		var rr: float = minf(size.x * 0.44, size.y * 0.36)
+		var base: PackedVector2Array = _base(disp)
+		var nb: int = 8
+		var toutes: Array = []
+		for k in nb:
+			var col: Color = cols[k % cols.size()]
+			var rot: float = TAU * float(k) / float(nb)
+			for flip in (2 if mir else 1):
+				var pts: PackedVector2Array = PackedVector2Array()
+				for p in base:
+					var q: Vector2 = p
+					if flip == 1:
+						q.y = -q.y
+					pts.append(ctr + q.rotated(rot) * rr)
+				if flip == 0:
+					toutes.append(pts)
+				_decor(pts, decor, col, k)
+				if disp == 1:
+					for e in [0.7, 0.45]:
+						var pe: PackedVector2Array = PackedVector2Array()
+						for p2 in pts:
+							pe.append(ctr + (p2 - ctr) * float(e))
+						_decor(pe, decor, Color(col.r, col.g, col.b, 0.6), k)
+				if disp == 8 or disp == 9:
+					var fin: Vector2 = pts[pts.size() - 1]
+					var nbp: int = 1 if disp == 8 else 2
+					for m in nbp:
+						var orig: Vector2 = pts[pts.size() - 1 - m * 5]
+						var mini: PackedVector2Array = PackedVector2Array()
+						for p3 in base:
+							mini.append(orig + p3.rotated(rot + 0.7 - float(m)) * rr * 0.32)
+						_decor(mini, decor, col.lightened(0.15), k)
+					draw_circle(fin, 1.5, col)
+		if disp == 4 or disp == 7:
+			var idxs: Array = [4, 8, 12] if disp == 4 else [6, 11]
+			for k in nb:
+				var cl: Color = cols[k % cols.size()]
+				for ii in idxs:
+					var a: Vector2 = (toutes[k] as PackedVector2Array)[int(ii)]
+					var b: Vector2 = (toutes[(k + 1) % nb] as PackedVector2Array)[int(ii)]
+					draw_line(a, b, Color(cl.r, cl.g, cl.b, 0.55), 1.3)
+		draw_circle(ctr, 3.0, Color(1, 1, 1, 0.85))
+		var f: Font = get_theme_default_font()
+		var nom: String = str(g[0])
+		draw_string(f, Vector2(0, size.y - 12), nom, HORIZONTAL_ALIGNMENT_CENTER, size.x, 21, Color(0.93, 0.95, 1.0) if not button_pressed else Color.WHITE)
 
 
 func _ready() -> void:
@@ -135,7 +325,16 @@ func _theme() -> Theme:
 			c = Color(0.20, 0.42, 0.85)
 		elif etat == "focus":
 			c = Color(0.17, 0.19, 0.28)
-		t.set_stylebox(etat, "Button", _style(c))
+		var sb: StyleBoxFlat = _style(c, 14)
+		if etat == "pressed" or etat == "hover_pressed":
+			sb.shadow_color = Color(0.45, 0.50, 1.0, 0.55)
+			sb.shadow_size = 9
+			sb.border_color = Color(1, 1, 1, 0.75)
+			sb.set_border_width_all(2)
+		else:
+			sb.border_color = Color(1, 1, 1, 0.12)
+			sb.set_border_width_all(1)
+		t.set_stylebox(etat, "Button", sb)
 	t.set_color("font_color", "Button", Color(0.92, 0.94, 1.0))
 	t.set_color("font_pressed_color", "Button", Color(1, 1, 1))
 	t.set_color("font_hover_color", "Button", Color(1, 1, 1))
@@ -313,6 +512,10 @@ func rafraichir() -> void:
 	if _grilles_genres.size() > 0:
 		for f in _grilles_genres.size():
 			(_grilles_genres[f] as Control).visible = (f == _famille)
+	if app != null and app.reg != null and int(app.reg.palette) != _pal_vignettes:
+		_pal_vignettes = int(app.reg.palette)
+		for vv in _vignettes:
+			(vv as Control).queue_redraw()
 	if _desc_mouv != null:
 		var mv: int = clampi(app.sc.mouvement, 0, DESC_MOUVEMENTS.size() - 1)
 		_desc_mouv.text = str(Tables.NOMS_MOUVEMENTS[mv]) + " : " + str(DESC_MOUVEMENTS[mv])
@@ -329,24 +532,39 @@ func _onglet_genres() -> void:
 	_titre(p, "Genre (48)")
 	var rf: HBoxContainer = _rangee(p)
 	var noms_f: Array = Tables.NOMS_FAMILLES
+	var btn_fam: Array = []
 	for f in noms_f.size():
 		var b: Button = Button.new()
 		b.text = str(noms_f[f])
+		b.toggle_mode = true
 		b.custom_minimum_size = Vector2(0, 60)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.pressed.connect(func() -> void:
 			_famille = f
 			rafraichir())
 		rf.add_child(b)
+		btn_fam.append(b)
+	_gr["famille"] = {"btns": btn_fam, "get": func() -> int: return _famille}
 	for f in noms_f.size():
 		var idx: Array = Tables.genres_de_famille(f)
-		var noms: Array = []
-		for gi in idx:
-			noms.append(str(Tables.GENRES[int(gi)][0]))
-		var g: GridContainer = _grille(p, "", noms, 4, Callable(), func(i: int) -> void: app.regler("genre", int(idx[i])))
+		var g: GridContainer = GridContainer.new()
+		g.columns = 6
+		g.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		p.add_child(g)
 		var bt: Array = []
-		for ch in g.get_children():
-			bt.append(ch)
+		for ii in idx.size():
+			var vg: Vignette = Vignette.new()
+			vg.genre = int(idx[ii])
+			vg.appli = app
+			vg.toggle_mode = true
+			vg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			vg.custom_minimum_size = Vector2(0, 150)
+			vg.pressed.connect(func() -> void:
+				app.regler("genre", int(idx[ii]))
+				rafraichir())
+			g.add_child(vg)
+			bt.append(vg)
+			_vignettes.append(vg)
 		_gr["genre_%d" % f] = {"btns": bt, "get": func() -> int: return idx.find(int(app.reg.genre))}
 		_grilles_genres.append(g)
 	_curseur(p, "branches", "Branches (symetrie)", 2, 36, 1, func() -> float: return float(app.reg.branches), func(v: float) -> void: app.regler("branches", int(v)), "%d")

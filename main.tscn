@@ -15,6 +15,7 @@
 [ext_resource type="Script" path="res://scripts/v21_manager.gd" id="13"]
 [ext_resource type="Script" path="res://scripts/v23_manager.gd" id="14"]
 [ext_resource type="Script" path="res://scripts/v25_manager.gd" id="15"]
+[ext_resource type="Script" path="res://scripts/v26_manager.gd" id="16"]
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1")
@@ -60,3 +61,6 @@ script = ExtResource("14")
 
 [node name="V25Manager" type="Node" parent="."]
 script = ExtResource("15")
+
+[node name="V26Manager" type="Node" parent="."]
+script = ExtResource("16")
