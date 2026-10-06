@@ -54,19 +54,20 @@ static func depuis_json(j: Dictionary) -> Reglages:
 	r.genre = clampi(_ent(j, "g", 0), 0, Tables.GENRES.size() - 1)
 	r.branches = clampi(_ent(j, "b", 12), 2, 36)
 	r.miroir = j.get("m", false) == true
-	r.epaisseur = _reel(j, "e", 1.4)
-	r.opacite = _reel(j, "o", 0.85)
+	# v9 : tout ce qui vient d'un JSON est borne comme dans l'interface.
+	r.epaisseur = clampf(_reel(j, "e", 1.4), 0.3, 12.0)
+	r.opacite = clampf(_reel(j, "o", 0.85), 0.1, 1.0)
 	r.palette = clampi(_ent(j, "pa", 0), 0, Tables.palettes.size() - 1)
 	r.mode = clampi(_ent(j, "mo", 1), 0, Tables.NOMS_MODES.size() - 1)
 	r.symbole = clampi(_ent(j, "sy", 0), 0, Tables.NOMS_SYMBOLES.size() - 1)
-	r.espacement = _ent(j, "es", 6)
-	r.iterations = _ent(j, "it", 4)
-	r.reduction = _reel(j, "re", 0.62)
-	r.torsion = _reel(j, "to", 0.35)
+	r.espacement = clampi(_ent(j, "es", 6), 2, 16)
+	r.iterations = clampi(_ent(j, "it", 4), 2, 12)
+	r.reduction = clampf(_reel(j, "re", 0.62), 0.30, 0.95)
+	r.torsion = clampf(_reel(j, "to", 0.35), 0.0, 1.2)
 	r.reseau = clampi(_ent(j, "rs", 0), 0, Tables.NOMS_RESEAUX.size() - 1)
-	r.recursion = _ent(j, "rc", 0)
+	r.recursion = clampi(_ent(j, "rc", 0), 0, 4)
 	r.motif = clampi(_ent(j, "mt", 0), 0, Tables.NOMS_MOTIFS.size() - 1)
-	r.segments_gen = _ent(j, "sg", 4)
+	r.segments_gen = clampi(_ent(j, "sg", 4), 2, 8)
 	return r
 
 

@@ -23,6 +23,9 @@ jobs:
       - name: Preparation
         run: bash outils/preparer.sh
 
+      - name: Validation Godot
+        run: bash outils/verifier.sh
+
       - name: Export
         run: bash outils/exporter.sh
 

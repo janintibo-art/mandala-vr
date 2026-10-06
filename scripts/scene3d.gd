@@ -285,7 +285,6 @@ func _lancer() -> void:
 func _tache_prep(i: int) -> void:
 	var t: TraitDessin = _snap[i]
 	Peintre.preparer(t)
-	# sonde : estimation du nombre d'elements si on dessinait tout
 	var p: Peintre = Peintre.new()
 	p.rm = RM
 	p.demi_h = RM
@@ -489,10 +488,9 @@ func annuler() -> bool:
 	return true
 
 
-# --------------------------------------------------------------- visée
+# --------------------------------------------------------------- visee
 
 func relief_monde(x: float, y: float) -> float:
-	# x,y en metres dans le repere de la scene ; renvoie z en metres
 	if rel_mode == 0:
 		return 0.0
 	var d: float = sqrt(x * x + y * y) / PX
@@ -551,9 +549,21 @@ func viser(o_w: Vector3, d_w: Vector3) -> Variant:
 	var inv: Transform3D = global_transform.affine_inverse()
 	var o: Vector3 = inv * o_w
 	var d: Vector3 = (inv.basis * d_w).normalized()
+	var rmax: float = RM * PX * 1.02
+	# v9 : un mandala plat n'a pas besoin du raymarch de plusieurs centaines
+	# d'etapes. Une intersection rayon/plan suffit et coute presque rien.
+	if rel_mode == 0:
+		if absf(d.z) < 0.00001:
+			return null
+		var tp: float = -o.z / d.z
+		if tp <= 0.0:
+			return null
+		var pp: Vector3 = o + d * tp
+		if Vector2(pp.x, pp.y).length() <= rmax:
+			return pp
+		return null
 	var t: float = 0.1
 	var prev: float = _ecart(o + d * t)
-	var rmax: float = RM * PX * 1.02
 	while t < 80.0:
 		var t2: float = t + 0.12
 		var cur: float = _ecart(o + d * t2)

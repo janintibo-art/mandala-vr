@@ -24,6 +24,7 @@ var _cache: Dictionary = {}
 var _note: AudioStreamWAV = null
 var _thread: Thread = null
 var _type_en_cours: int = -1
+var _attente_ambiance: int = -1
 var _voix_suiv: int = 0
 var _dernier_degre: int = -99
 var _dernier_t: int = 0
@@ -57,14 +58,31 @@ func _db() -> float:
 	return linear_to_db(maxf(volume, 0.0001))
 
 
+func _lancer_generation_ambiance(i: int) -> void:
+	if i <= 0 or i >= NOMS_AMBIANCES.size() or _cache.has(i) or _thread != null:
+		return
+	_type_en_cours = i
+	_thread = Thread.new()
+	_thread.start(_generer_ambiance.bind(i))
+
+
 func _process(_dt: float) -> void:
 	if _thread != null and not _thread.is_alive():
 		var res: Array = _thread.wait_to_finish()
 		_thread = null
 		var t: int = int(res[0])
 		_cache[t] = _flux(res[1] as PackedByteArray, true)
+		_type_en_cours = -1
 		if t == ambiance:
 			_jouer_fond()
+		# v9 : si l'utilisateur a change d'ambiance pendant la synthese,
+		# on lance automatiquement la derniere demandee au lieu de rester muet.
+		var suivant: int = _attente_ambiance
+		_attente_ambiance = -1
+		if suivant <= 0 or suivant != ambiance:
+			suivant = ambiance
+		if suivant > 0 and not muet and not _cache.has(suivant):
+			_lancer_generation_ambiance(suivant)
 	if _note_thread != null and not _note_thread.is_alive():
 		var r2: Array = _note_thread.wait_to_finish()
 		_note_thread = null
@@ -94,16 +112,23 @@ func demarrage() -> void:
 
 
 func choisir_ambiance(i: int) -> void:
+	i = clampi(i, 0, NOMS_AMBIANCES.size() - 1)
 	ambiance = i
 	_fond.stop()
-	if i == 0 or muet:
+	if i == 0:
+		_attente_ambiance = -1
+		return
+	if muet:
+		_attente_ambiance = i
 		return
 	if _cache.has(i):
+		_attente_ambiance = -1
 		_jouer_fond()
 	elif _thread == null:
-		_type_en_cours = i
-		_thread = Thread.new()
-		_thread.start(_generer_ambiance.bind(i))
+		_attente_ambiance = -1
+		_lancer_generation_ambiance(i)
+	else:
+		_attente_ambiance = i
 
 
 func _jouer_fond() -> void:
@@ -115,7 +140,7 @@ func _jouer_fond() -> void:
 
 
 func regler_volume(v: float) -> void:
-	volume = v
+	volume = clampf(v, 0.0, 1.0)
 	_fond.volume_db = _db()
 
 
@@ -125,11 +150,17 @@ func basculer_muet() -> void:
 		_fond.stop()
 		_bref.stop()
 	else:
-		_jouer_fond()
+		if ambiance > 0 and not _cache.has(ambiance):
+			if _thread == null:
+				_lancer_generation_ambiance(ambiance)
+			else:
+				_attente_ambiance = ambiance
+		else:
+			_jouer_fond()
 
 
 func jouer_note(u: float, force: float) -> void:
-	if gamme <= 0 or muet or _note == null:
+	if gamme <= 0 or gamme >= GAMMES.size() or muet or _note == null:
 		return
 	var v: float = clampf(u, 0.0, 1.0)
 	var degre: int = int(round((1.0 - v) * float(NB_NOTES - 1)))
@@ -141,6 +172,8 @@ func jouer_note(u: float, force: float) -> void:
 	_dernier_degre = degre
 	_dernier_t = maintenant
 	var demi: Array = GAMMES[gamme]
+	if demi.is_empty():
+		return
 	var oct: int = degre / demi.size()
 	var k: int = degre % demi.size()
 	var semi: float = float(int(demi[k]) + 12 * oct)
