@@ -1,171 +1,179 @@
 class_name Generateur
 extends RefCounted
+## Port de generateur.dart et config.dart du telephone : gestes de depart,
+## composition de scenes, 13 configurations livrees, tirage au sort.
 
-const CONFIGS: Array = [
-	{"nom": "Fleur de cristal", "genre": 13, "palette": 8, "relief": 1, "mode": 0, "n": 12, "fam": [1, 3, 5]},
-	{"nom": "Tourbillon océan", "genre": 14, "palette": 2, "relief": 6, "mode": 1, "n": 10, "fam": [0, 2]},
-	{"nom": "Pulsar néon", "genre": 12, "palette": 4, "relief": 9, "mode": 3, "n": 8, "fam": [1, 2, 4]},
-	{"nom": "Entonnoir doré", "genre": 7, "palette": 12, "relief": 3, "mode": 0, "n": 12, "fam": [0, 1]},
-	{"nom": "Dôme de verre", "genre": 9, "palette": 10, "relief": 1, "mode": 2, "n": 12, "fam": [3, 5, 1]},
-	{"nom": "Vague aurore", "genre": 15, "palette": 6, "relief": 4, "mode": 4, "n": 16, "fam": [4, 0, 3]},
-	{"nom": "Cône de feu", "genre": 3, "palette": 1, "relief": 2, "mode": 0, "n": 8, "fam": [0, 1]},
-	{"nom": "Tore arc-en-ciel", "genre": 8, "palette": 0, "relief": 7, "mode": 3, "n": 12, "fam": [2, 3]},
-	{"nom": "Marches vitrail", "genre": 6, "palette": 10, "relief": 8, "mode": 2, "n": 10, "fam": [5, 1, 4]},
-	{"nom": "Bulbe forêt", "genre": 5, "palette": 3, "relief": 9, "mode": 1, "n": 12, "fam": [3, 1]},
-	{"nom": "Bol Matrix", "genre": 4, "palette": 11, "relief": 6, "mode": 0, "n": 10, "fam": [0, 5]},
-	{"nom": "Ondes glace", "genre": 2, "palette": 8, "relief": 5, "mode": 4, "n": 12, "fam": [2, 0, 3]},
-]
+const BRANCHES_HEUREUSES: Array = [6, 8, 9, 10, 12, 14, 16, 18, 20, 24]
+const FONDS_SOMBRES: Array = [0, 1, 2, 4, 5]
 
 
-static func nouvelle_scene(rng: RandomNumberGenerator, cfg: int) -> Dictionary:
-	var idx: int = cfg
-	if idx < 0 or idx >= CONFIGS.size():
-		idx = rng.randi_range(0, CONFIGS.size() - 1)
-	var c: Dictionary = CONFIGS[idx]
-	var fam: Array = c["fam"]
-	var nb: int = rng.randi_range(3, 6)
+static func _pol(r: float, a: float) -> Vector2:
+	return Vector2(cos(a) * r, sin(a) * r)
+
+
+static func _geste(h: RandomNumberGenerator, rayon: float) -> PackedVector2Array:
+	var type: int = h.randi_range(0, 5)
+	var n: int = 70 + h.randi_range(0, 129)
+	var a0: float = h.randf() * TAU
+	var pts: PackedVector2Array = PackedVector2Array()
+	match type:
+		0:
+			var r0: float = rayon * (0.10 + h.randf() * 0.28)
+			var r1: float = rayon * (0.48 + h.randf() * 0.46)
+			var da: float = h.randf() * 1.5 - 0.75
+			var amp: float = h.randf() * 0.22
+			var k: int = 2 + h.randi_range(0, 4)
+			for i in n + 1:
+				var u: float = float(i) / float(n)
+				pts.append(_pol(r0 + (r1 - r0) * u + rayon * amp * sin(u * PI * float(k)), a0 + da * u))
+		1:
+			var r0: float = rayon * (0.08 + h.randf() * 0.16)
+			var r1: float = rayon * (0.55 + h.randf() * 0.4)
+			var large: float = 0.25 + h.randf() * 0.7
+			for i in n + 1:
+				var u: float = float(i) / float(n)
+				pts.append(_pol(r0 + (r1 - r0) * sin(u * PI), a0 + large * (u - 0.5)))
+		2:
+			var r0: float = rayon * (0.05 + h.randf() * 0.12)
+			var r1: float = rayon * (0.6 + h.randf() * 0.38)
+			var tours: float = 0.6 + h.randf() * 2.4
+			for i in n + 1:
+				var u: float = float(i) / float(n)
+				pts.append(_pol(r0 + (r1 - r0) * u, a0 + tours * TAU * u))
+		3:
+			var rc: float = rayon * (0.28 + h.randf() * 0.55)
+			var amp: float = rayon * (0.03 + h.randf() * 0.14)
+			var k: int = 3 + h.randi_range(0, 7)
+			var etendue: float = 0.6 + h.randf() * 2.2
+			for i in n + 1:
+				var u: float = float(i) / float(n)
+				pts.append(_pol(rc + amp * sin(u * PI * float(k)), a0 + etendue * u))
+		4:
+			var r0: float = rayon * (0.04 + h.randf() * 0.1)
+			var r1: float = rayon * (0.7 + h.randf() * 0.3)
+			var courbe: float = h.randf() * 0.9 - 0.45
+			for i in n + 1:
+				var u: float = float(i) / float(n)
+				pts.append(_pol(r0 + (r1 - r0) * u, a0 + courbe * u * u))
+		_:
+			var d: float = rayon * (0.25 + h.randf() * 0.45)
+			var rr: float = rayon * (0.1 + h.randf() * 0.25)
+			var centre: Vector2 = _pol(d, a0)
+			var lobes: int = 2 + h.randi_range(0, 4)
+			var deform: float = h.randf() * 0.45
+			for i in n + 1:
+				var u: float = float(i) / float(n)
+				var a: float = u * TAU
+				var r: float = rr * (1.0 + deform * sin(a * float(lobes)))
+				pts.append(centre + _pol(r, a))
+	return pts
+
+
+static func composer_scene(base: Reglages, rayon: float, h: RandomNumberGenerator) -> Array:
+	var nb: int = 2 + h.randi_range(0, 3)
 	var traits: Array = []
-	for k in nb:
-		var f: int = int(fam[rng.randi_range(0, fam.size() - 1)])
-		traits.append(_trait(rng, f))
+	var choix: Array = [6, 8, 9, 12, 14, 16, 18, 24]
+	for i in nb:
+		var r: Reglages = base.copie()
+		r.epaisseur = clampf(base.epaisseur * (0.65 + h.randf() * 0.9), 0.3, 12.0)
+		r.opacite = clampf(base.opacite * (0.7 + h.randf() * 0.45), 0.15, 1.0)
+		if h.randf() < 0.35:
+			r.branches = int(choix[h.randi_range(0, 7)])
+		if r.reseau != 0:
+			r.recursion = 0
+		if r.recursion > 4:
+			r.recursion = 4
+		var t: TraitDessin = TraitDessin.new(r, i)
+		for p in _geste(h, rayon):
+			t.ajouter(p)
+		t.fige = true
+		t.calque = 0
+		if t.points.size() > 2:
+			t.calque = clampi(int(floorf(clampf(t.points[0].length() / rayon, 0.0, 0.999) * 3.0)), 0, 2)
+			traits.append(t)
+	return traits
+
+
+# ----------------------------------------------------------- configurations
+
+static func _cfg(nom: String, g: String, pal: String, b: int, e: float, o: float, mode: int, extra: Dictionary = {}) -> Dictionary:
+	var r: Reglages = Reglages.new()
+	r.genre = Tables.genre_par_nom(g)
+	r.palette = Tables.palette_par_nom(pal)
+	r.branches = b
+	r.epaisseur = e
+	r.opacite = o
+	r.mode = mode
+	r.symbole = Tables.symbole_par_nom(str(extra.get("symbole", "De")))
+	r.espacement = int(extra.get("espacement", 6))
+	r.iterations = int(extra.get("iterations", 4))
+	r.reduction = float(extra.get("reduction", 0.62))
+	r.torsion = float(extra.get("torsion", 0.35))
 	return {
-		"nom": c["nom"],
-		"genre": c["genre"],
-		"palette": c["palette"],
-		"relief": c["relief"],
-		"mode": c["mode"],
-		"n": c["n"],
-		"traits": traits,
+		"nom": nom, "reglages": r,
+		"rel_mode": int(extra.get("rel_mode", 0)),
+		"rel_h": float(extra.get("rel_h", 0.55)),
+		"rel_lum": float(extra.get("rel_lum", 0.6)),
+		"mouvement": int(extra.get("mouvement", 0)),
+		"vitesse": float(extra.get("vitesse", 1.0)),
+		"fond": int(extra.get("fond", 0)),
+		"fx": extra.get("fx", {}),
 	}
 
 
-static func _trait(rng: RandomNumberGenerator, f: int) -> PackedVector2Array:
-	var pts: PackedVector2Array
-	match f:
-		0:
-			pts = _spirale(rng)
-		1:
-			pts = _rose(rng)
-		2:
-			pts = _spiro(rng)
-		3:
-			pts = _petales(rng)
-		4:
-			pts = _zigzag(rng)
-		_:
-			pts = _etoile(rng)
-	return _densifier(pts, 0.03)
+static func configs_livrees() -> Array:
+	return [
+		_cfg("Cathedrale", "Cathedrale", "Cathedrale", 12, 2.2, 1.0, 1, {"fx": Presets.fx("Vitrail")}),
+		_cfg("Nuit Matrix", "Matrix", "Matrix", 16, 1.1, 0.72, 3, {"espacement": 4, "fond": 1, "fx": Presets.fx("Neon")}),
+		_cfg("Dome d'argent", "Toile", "Argent", 14, 1.0, 0.8, 5, {"rel_mode": 1, "rel_h": 0.82, "mouvement": 1, "vitesse": 0.6, "fx": Presets.fx("Cristal")}),
+		_cfg("Puits sans fond", "Gigogne", "Encre", 10, 1.6, 0.9, 4, {"iterations": 7, "reduction": 0.68, "torsion": 0.4, "rel_mode": 3, "rel_h": 0.9, "mouvement": 7, "vitesse": 0.7, "fx": Presets.fx("Neon")}),
+		_cfg("Givre clair", "Givre", "Lagon", 18, 0.9, 0.85, 1, {"fond": 3, "fx": Presets.fx("Mat")}),
+		_cfg("Constellation", "Constellation", "Argent", 20, 0.8, 0.95, 9, {"fond": 1, "fx": Presets.fx("Cristal")}),
+		_cfg("Vitrail tournant", "Vitrail", "Cathedrale", 10, 2.0, 1.0, 1, {"rel_mode": 1, "rel_h": 0.6, "mouvement": 6, "vitesse": 0.5, "fx": Presets.fx("Vitrail")}),
+		_cfg("Spirale d'or", "Fractale", "Or", 8, 1.3, 0.9, 4, {"iterations": 12, "reduction": 0.93, "torsion": 0.28, "mouvement": 7, "vitesse": 0.8, "fx": Presets.fx("Braise")}),
+		_cfg("Dentelle de braise", "Filigrane", "Braise", 12, 1.1, 0.9, 4, {"iterations": 6, "reduction": 0.7, "torsion": 0.5, "fx": Presets.fx("Braise")}),
+		_cfg("Circuit imprime", "Circuit", "Jade", 8, 1.4, 1.0, 8, {"fond": 1, "fx": Presets.fx("Neon")}),
+		_cfg("Meduse", "Meduse", "Polaire", 9, 1.0, 0.8, 5, {"iterations": 5, "reduction": 0.74, "torsion": 0.22, "rel_mode": 1, "rel_h": 0.7, "mouvement": 4, "vitesse": 0.9, "fx": Presets.fx("Aurore")}),
+		_cfg("Chapelet d'etoiles", "Cascade", "Prisme", 12, 1.2, 0.95, 2, {"symbole": "Etoile", "espacement": 5, "iterations": 5, "reduction": 0.66, "torsion": 0.3, "fx": Presets.fx("Arc-en-ciel")}),
+		_cfg("Nuit de glace", "Rosace infinie", "Banquise", 14, 1.2, 0.9, 10, {"iterations": 8, "reduction": 0.72, "torsion": 0.3, "fond": 4, "mouvement": 7, "vitesse": 0.6, "fx": Presets.fx("Cristal")}),
+		_cfg("Lave vivante", "Nebuleuse", "Lave", 16, 1.8, 0.85, 12, {"rel_mode": 4, "rel_h": 0.7, "fond": 1, "mouvement": 3, "vitesse": 0.5, "fx": Presets.fx("Braise")}),
+	]
 
 
-static func _pgcd(a: int, b: int) -> int:
-	while b != 0:
-		var t: int = a % b
-		a = b
-		b = t
-	return a
-
-
-static func _densifier(pts: PackedVector2Array, pas_max: float) -> PackedVector2Array:
-	var out: PackedVector2Array = PackedVector2Array()
-	if pts.is_empty():
-		return out
-	out.append(pts[0])
-	for k in range(1, pts.size()):
-		var a: Vector2 = pts[k - 1]
-		var b: Vector2 = pts[k]
-		var l: float = a.distance_to(b)
-		var nb: int = maxi(1, int(ceil(l / pas_max)))
-		for j in range(1, nb + 1):
-			out.append(a.lerp(b, float(j) / float(nb)))
-	return out
-
-
-static func _tourner(pts: PackedVector2Array, ang: float) -> PackedVector2Array:
-	var out: PackedVector2Array = PackedVector2Array()
-	for p in pts:
-		out.append(p.rotated(ang))
-	return out
-
-
-static func _spirale(rng: RandomNumberGenerator) -> PackedVector2Array:
-	var tours: float = rng.randf_range(1.5, 4.0)
-	var sens: float = 1.0 if rng.randf() < 0.5 else -1.0
-	var pts: PackedVector2Array = PackedVector2Array()
-	var nb: int = 160
-	for k in nb + 1:
-		var t: float = float(k) / float(nb)
-		var r: float = 0.04 + 0.92 * pow(t, 0.85)
-		pts.append(Vector2(r, 0.0).rotated(sens * TAU * tours * t))
-	return _tourner(pts, rng.randf_range(0.0, TAU))
-
-
-static func _rose(rng: RandomNumberGenerator) -> PackedVector2Array:
-	var choix: Array = [[3, 1], [5, 1], [5, 2], [7, 3], [4, 3], [7, 2]]
-	var ch: Array = choix[rng.randi_range(0, choix.size() - 1)]
-	var k: float = float(ch[0]) / float(ch[1])
-	var tmax: float = TAU * float(ch[1])
-	var pts: PackedVector2Array = PackedVector2Array()
-	var nb: int = 420
-	for j in nb + 1:
-		var th: float = tmax * float(j) / float(nb)
-		var r: float = 0.92 * cos(k * th)
-		pts.append(Vector2(r * cos(th), r * sin(th)))
-	return _tourner(pts, rng.randf_range(0.0, TAU))
-
-
-static func _spiro(rng: RandomNumberGenerator) -> PackedVector2Array:
-	var choix: Array = [[5, 2], [7, 3], [8, 3], [5, 3], [7, 2], [9, 4]]
-	var ch: Array = choix[rng.randi_range(0, choix.size() - 1)]
-	var gr: float = float(ch[0])
-	var pr: float = float(ch[1])
-	var d: float = pr * rng.randf_range(0.7, 1.3)
-	var g: int = _pgcd(int(ch[0]), int(ch[1]))
-	var tmax: float = TAU * pr / float(g)
-	var pts: PackedVector2Array = PackedVector2Array()
-	var nb: int = 460
-	var rmax: float = 0.0001
-	for j in nb + 1:
-		var t: float = tmax * float(j) / float(nb)
-		var x: float = (gr - pr) * cos(t) + d * cos((gr - pr) / pr * t)
-		var y: float = (gr - pr) * sin(t) - d * sin((gr - pr) / pr * t)
-		var v: Vector2 = Vector2(x, y)
-		rmax = maxf(rmax, v.length())
-		pts.append(v)
-	for j in pts.size():
-		pts[j] = pts[j] * (0.93 / rmax)
-	return _tourner(pts, rng.randf_range(0.0, TAU))
-
-
-static func _petales(rng: RandomNumberGenerator) -> PackedVector2Array:
-	var k: int = rng.randi_range(3, 9)
-	var pts: PackedVector2Array = PackedVector2Array()
-	var nb: int = 320
-	for j in nb + 1:
-		var th: float = TAU * float(j) / float(nb)
-		var r: float = 0.12 + 0.8 * (0.5 + 0.5 * cos(float(k) * th))
-		pts.append(Vector2(r * cos(th), r * sin(th)))
-	return _tourner(pts, rng.randf_range(0.0, TAU))
-
-
-static func _zigzag(rng: RandomNumberGenerator) -> PackedVector2Array:
-	var amp: float = rng.randf_range(0.08, 0.22)
-	var f: float = float(rng.randi_range(3, 9))
-	var pts: PackedVector2Array = PackedVector2Array()
-	var nb: int = 170
-	for j in nb + 1:
-		var t: float = 0.04 + 0.9 * float(j) / float(nb)
-		pts.append(Vector2(t, amp * sin(f * TAU * t) * (0.4 + t)))
-	return _tourner(pts, rng.randf_range(0.0, TAU))
-
-
-static func _etoile(rng: RandomNumberGenerator) -> PackedVector2Array:
-	var ks: Array = [5, 7, 9, 11]
-	var k: int = int(ks[rng.randi_range(0, ks.size() - 1)])
-	var j: int = rng.randi_range(2, (k - 1) / 2)
-	while _pgcd(k, j) != 1:
-		j += 1
-	var pts: PackedVector2Array = PackedVector2Array()
-	for i in k + 1:
-		var a: float = float(i * j) * TAU / float(k)
-		pts.append(Vector2(0.9, 0.0).rotated(a))
-	return _tourner(pts, rng.randf_range(0.0, TAU))
+static func tirage(h: RandomNumberGenerator, nom: String, vizu: bool = false) -> Dictionary:
+	var g: int = h.randi_range(0, Tables.GENRES.size() - 1)
+	var pa: int = h.randi_range(0, Tables.palettes.size() - 1)
+	var avec_relief: bool = h.randf() < 0.45
+	var bouge: bool = h.randf() < 0.6
+	var cols: PackedColorArray = Tables.palettes[pa]["cols"]
+	var claire: bool = cols[0].get_luminance() > 0.58
+	var r: Reglages = Reglages.new()
+	r.genre = g
+	r.palette = pa
+	r.reseau = h.randi_range(1, 5) if h.randf() < 0.25 else 0
+	r.branches = int(BRANCHES_HEUREUSES[h.randi_range(0, BRANCHES_HEUREUSES.size() - 1)])
+	r.miroir = h.randf() < 0.4
+	r.epaisseur = 0.6 + h.randf() * 2.4
+	r.opacite = 0.55 + h.randf() * 0.45
+	r.mode = h.randi_range(0, Tables.NOMS_MODES.size() - 1)
+	r.symbole = h.randi_range(0, Tables.NOMS_SYMBOLES.size() - 1)
+	r.espacement = 3 + h.randi_range(0, 7)
+	r.iterations = 3 + h.randi_range(0, 6)
+	r.reduction = 0.55 + h.randf() * 0.35
+	r.torsion = h.randf() * 0.7
+	var mv: int = 0
+	if vizu:
+		mv = h.randi_range(1, 8)
+	elif bouge:
+		mv = h.randi_range(1, 9)
+	var noms_fx: Array = Presets.noms()
+	return {
+		"nom": nom, "reglages": r,
+		"rel_mode": h.randi_range(1, Tables.NOMS_RELIEFS.size() - 1) if avec_relief else 0,
+		"rel_h": 0.4 + h.randf() * 0.7,
+		"rel_lum": 0.6,
+		"mouvement": mv,
+		"vitesse": 0.4 + h.randf() * (1.1 if vizu else 1.2),
+		"fond": 3 if claire else int(FONDS_SOMBRES[h.randi_range(0, FONDS_SOMBRES.size() - 1)]),
+		"fx": Presets.fx(str(noms_fx[h.randi_range(0, noms_fx.size() - 1)])),
+	}

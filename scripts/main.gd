@@ -1,10 +1,8 @@
 extends Node3D
 
-const BUDGET_QUADS: int = 90000
-const PAS_TRACE: float = 0.02
-const MAX_LIVE_PTS: int = 1500
-const MAX_TRAITS: int = 80
 const VITESSE_VOL: float = 3.5
+const BUDGETS: Array = [45000, 90000, 160000]
+const RM: float = Tables.RM
 
 var xr: XRInterface = null
 var xr_actif: bool = false
@@ -12,43 +10,44 @@ var origine: XROrigin3D
 var camera: XRCamera3D
 var main_d: XRController3D
 var main_g: XRController3D
-var monde: Node3D
-var anneaux: Array = []
-var mat_ruban: ShaderMaterial
+var sc: Scene3D
+var panneau: Panneau
+var env: Environment
+var sol: MeshInstance3D
 
-var traits: Array = []
-var etat: Dictionary = {"n": 12, "genre": 1, "palette": 0, "relief": 1, "mode": 0, "largeur": 0.009}
-var anime: bool = true
-var vit_anneaux: Array = [0.20, -0.12, 0.07]
+var reg: Reglages = Reglages.new()
+var tout: bool = true
+var qualite: int = 1
+var sol_visible: bool = true
+var duree_defaut: float = 25.0
+var vizu_duree: float = 20.0
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
-var nom_scene: String = ""
 
-var _thread: Thread = null
-var _occupe: bool = false
-var _relancer: bool = false
-var _file: Array = []
-var _creation: bool = false
-var _nouveaux: Array = []
-var _differe: Array = []
-
-var _trace: bool = false
-var _veut_tracer: bool = false
-var _live_pts: PackedVector2Array = PackedVector2Array()
-var _live_acc: Array = []
-var _live_nodes: Array = []
-var _live_dirty: bool = false
-var _live_chrono: float = 0.0
-var _live_long: float = 0.0
-
-var _bouts: Dictionary = {}
-var _tour_libre: bool = true
 var _curseur: MeshInstance3D
 var _rayon: MeshInstance3D
 var _hud: Label3D
 var _msg_label: Label3D
 var _msg_temps: float = 0.0
 var _aide: Label3D
-var _aide_temps: float = 70.0
+var _aide_temps: float = 80.0
+var _bouts: Dictionary = {}
+var _tour_libre: bool = true
+var _live_k: int = 0
+var _prefs_sale: bool = false
+var _prefs_chrono: float = 0.0
+
+# diffusion
+var _diff_actif: bool = false
+var _diff_vizu: bool = false
+var _diff_liste: int = 0
+var _diff_i: int = -1
+var _diff_t: float = 0.0
+var _diff_dur: float = 0.0
+var _diff_phase: int = 0
+var _diff_phase_t: float = 0.0
+var _diff_suite: int = 1
+var _voile: MeshInstance3D
+var _voile_mat: StandardMaterial3D
 
 
 func _ready() -> void:
@@ -56,13 +55,10 @@ func _ready() -> void:
 	_init_xr()
 	_construire_monde()
 	_construire_joueur()
-	_nouvelle_scene(-1)
-
-
-func _exit_tree() -> void:
-	if _thread != null:
-		_thread.wait_to_finish()
-		_thread = null
+	_charger_prefs()
+	sc.budget = int(BUDGETS[qualite])
+	panneau.rafraichir()
+	hasard()
 
 
 func _init_xr() -> void:
@@ -76,14 +72,12 @@ func _init_xr() -> void:
 
 
 func _construire_monde() -> void:
-	var env: Environment = Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.004, 0.004, 0.02)
+	env = Environment.new()
 	var we: WorldEnvironment = WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
 
-	var sol: MeshInstance3D = MeshInstance3D.new()
+	sol = MeshInstance3D.new()
 	var pm: PlaneMesh = PlaneMesh.new()
 	pm.size = Vector2(300.0, 300.0)
 	sol.mesh = pm
@@ -92,16 +86,10 @@ func _construire_monde() -> void:
 	sol.material_override = ms
 	add_child(sol)
 
-	mat_ruban = ShaderMaterial.new()
-	mat_ruban.shader = load("res://shaders/ruban.gdshader")
-
-	monde = Node3D.new()
-	monde.position = Vector3(0.0, 2.0, -7.0)
-	add_child(monde)
-	for i in 3:
-		var a: Node3D = Node3D.new()
-		monde.add_child(a)
-		anneaux.append(a)
+	sc = Scene3D.new()
+	sc.position = Vector3(0.0, 2.0, -7.0)
+	add_child(sc)
+	sc.appliquer_fond(env)
 
 
 func _construire_joueur() -> void:
@@ -133,9 +121,9 @@ func _construire_joueur() -> void:
 		(h as Node3D).add_child(corps)
 
 	_rayon = MeshInstance3D.new()
-	var rm: BoxMesh = BoxMesh.new()
-	rm.size = Vector3(0.004, 0.004, 1.0)
-	_rayon.mesh = rm
+	var rmesh: BoxMesh = BoxMesh.new()
+	rmesh.size = Vector3(0.004, 0.004, 1.0)
+	_rayon.mesh = rmesh
 	var mr: StandardMaterial3D = StandardMaterial3D.new()
 	mr.albedo_color = Color(0.6, 0.9, 1.0)
 	mr.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -154,7 +142,7 @@ func _construire_joueur() -> void:
 	_curseur.visible = false
 	add_child(_curseur)
 
-	_hud = _etiquette(0.0009, 40)
+	_hud = _etiquette(0.0009, 36)
 	_hud.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_hud.position = Vector3(0.0, 0.13, 0.0)
 	main_g.add_child(_hud)
@@ -167,6 +155,28 @@ func _construire_joueur() -> void:
 	_aide.position = Vector3(0.0, 1.9, -3.2)
 	_aide.text = _texte_aide()
 	add_child(_aide)
+
+	panneau = Panneau.new()
+	panneau.app = self
+	panneau.visible = false
+	add_child(panneau)
+	panneau.vp.render_target_update_mode = SubViewport.UPDATE_DISABLED
+
+	_voile = MeshInstance3D.new()
+	var vs: SphereMesh = SphereMesh.new()
+	vs.radius = 0.4
+	vs.height = 0.8
+	_voile.mesh = vs
+	_voile_mat = StandardMaterial3D.new()
+	_voile_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_voile_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_voile_mat.albedo_color = Color(0, 0, 0, 0)
+	_voile_mat.cull_mode = BaseMaterial3D.CULL_FRONT
+	_voile_mat.no_depth_test = true
+	_voile_mat.render_priority = 100
+	_voile.material_override = _voile_mat
+	_voile.visible = false
+	camera.add_child(_voile)
 
 
 func _etiquette(taille_pixel: float, taille_police: int) -> Label3D:
@@ -186,325 +196,501 @@ func _texte_aide() -> String:
 	t += "Gâchette gauche : aller plus vite\n"
 	t += "Joystick droit : tourner, monter, descendre\n"
 	t += "Gâchette droite : dessiner sur l'image\n"
-	t += "A : genre     B : palette\n"
-	t += "X : relief     Y : couleurs\n"
-	t += "Clic joystick droit : nouveau mandala\n"
-	t += "Clic joystick gauche : nombre de branches\n"
-	t += "Grip droit : annuler\n"
-	t += "Grip gauche : retour au départ\n"
-	t += "Les deux grips : toile vierge\n"
-	t += "Menu : animation"
+	t += "Bouton menu gauche : TOUS LES REGLAGES\n"
+	t += "A : genre   B : palette   X : couleurs   Y : relief\n"
+	t += "Clic joystick droit : tirage au sort\n"
+	t += "Grip droit : annuler   Grip gauche : retour au départ\n"
+	t += "Les deux grips : toile vierge"
 	return t
 
 
-func _texte_hud() -> String:
-	var g: String = str(Tables.GENRES[int(etat["genre"])]["nom"])
-	var p: String = str(Tables.PALETTES[int(etat["palette"])][0])
-	var r: String = str(Tables.RELIEFS[int(etat["relief"])])
-	var c: String = str(Tables.MODES_COULEUR[int(etat["mode"])])
-	return "%s\n%s\nRelief : %s\nCouleur : %s\n%d branches" % [g, p, r, c, int(etat["n"])]
-
-
 func _maj_hud() -> void:
-	if _hud != null:
-		_hud.text = _texte_hud()
+	var g: String = str(Tables.GENRES[reg.genre][0])
+	var p: String = str(Tables.palettes[reg.palette]["nom"])
+	var m: String = str(Tables.NOMS_MODES[reg.mode])
+	var s: String = "%s | %s\n%s | %d branches | trait %.1f" % [g, p, m, reg.branches, reg.epaisseur]
+	if _diff_actif:
+		s += "\n" + ("Vizu" if _diff_vizu else "Diffusion %d" % (_diff_i + 1))
+	_hud.text = s
 
 
-func _msg(texte: String) -> void:
-	if _msg_label != null:
-		_msg_label.text = texte
-		_msg_temps = 3.0
+func message(texte: String) -> void:
+	_msg_label.text = texte
+	_msg_temps = 3.0
+	if panneau != null:
+		panneau.message(texte)
 
 
-func _params() -> Dictionary:
-	return etat.duplicate()
+# ------------------------------------------------------------ preferences
+
+func _charger_prefs() -> void:
+	var p: Dictionary = Stockage.prefs()
+	if p.get("perso", null) is Array:
+		for e in (p["perso"] as Array):
+			var d: Dictionary = e
+			var cols: PackedColorArray = PackedColorArray()
+			for h in (d.get("cols", []) as Array):
+				cols.append(Color.html(str(h)))
+			if cols.size() >= 2:
+				Tables.ajouter_palette(str(d.get("nom", "Perso")), cols)
+	if p.get("fx", null) is Dictionary:
+		for k in (p["fx"] as Dictionary).keys():
+			sc.fx[str(k)] = float((p["fx"] as Dictionary)[k])
+		sc.appliquer_fx()
+	qualite = clampi(int(p.get("qualite", 1)), 0, 2)
+	sc.lumineux = bool(p.get("lumineux", true))
+	tout = bool(p.get("tout", true))
+	duree_defaut = float(p.get("duree", 25.0))
+	vizu_duree = float(p.get("vizu", 20.0))
+	sol_visible = bool(p.get("sol", true))
+	sol.visible = sol_visible
+	panneau.palettes_changees()
 
 
-# ---------------------------------------------------------------- scènes
-
-func _vider() -> void:
-	for t in traits:
-		for nd in (t["nodes"] as Array):
-			(nd as Node).queue_free()
-	traits.clear()
+func _prefs_a_sauver() -> void:
+	_prefs_sale = true
+	_prefs_chrono = 1.5
 
 
-func _nouvelle_scene(cfg: int) -> void:
-	if _occupe:
-		_differe.clear()
-		_differe.append(func() -> void: _nouvelle_scene(cfg))
-		return
-	if _trace:
-		_fin_trace()
-	var s: Dictionary = Generateur.nouvelle_scene(rng, cfg)
-	_vider()
-	etat["n"] = int(s["n"])
-	etat["genre"] = int(s["genre"])
-	etat["palette"] = int(s["palette"])
-	etat["relief"] = int(s["relief"])
-	etat["mode"] = int(s["mode"])
-	for pts in (s["traits"] as Array):
-		traits.append({"pts": pts, "nodes": []})
-	nom_scene = str(s["nom"])
+func _sauver_prefs() -> void:
+	var perso: Array = []
+	for i in range(Tables.NB_LIVREES, Tables.palettes.size()):
+		if i < Tables.PALETTES_BRUTES.size():
+			continue
+		var cols: Array = []
+		for c in (Tables.palettes[i]["cols"] as PackedColorArray):
+			cols.append(c.to_html(false))
+		perso.append({"nom": Tables.palettes[i]["nom"], "cols": cols})
+	Stockage.sauver_prefs({
+		"perso": perso, "fx": sc.fx, "qualite": qualite, "lumineux": sc.lumineux,
+		"tout": tout, "duree": duree_defaut, "vizu": vizu_duree, "sol": sol_visible,
+	})
+
+
+# ------------------------------------------------------------- reglages
+
+func regler(champ: String, v: Variant) -> void:
+	var ancien: Variant = reg.get(champ)
+	reg.set(champ, v)
+	if tout:
+		for t in sc.traits:
+			var td: TraitDessin = t
+			if champ == "epaisseur" or champ == "opacite":
+				var a: float = float(ancien)
+				var f: float = 1.0 if a <= 0.0001 else float(v) / a
+				var nv: float = float(td.reglages.get(champ)) * f
+				td.reglages.set(champ, clampf(nv, 0.3, 12.0) if champ == "epaisseur" else clampf(nv, 0.1, 1.0))
+			else:
+				td.reglages.set(champ, v)
+			if champ == "recursion" or champ == "motif" or champ == "segments_gen":
+				td.oublier()
+		sc.demander_rec_differe(0.3)
+	if champ == "reduction" or champ == "torsion":
+		_maj_boucle()
 	_maj_hud()
-	_msg(nom_scene)
-	_demander_rec()
+	_prefs_a_sauver()
 
 
-func _toile_vierge() -> void:
-	if _occupe:
-		return
-	if _trace:
-		_fin_trace()
-	_vider()
-	_msg("Toile vierge")
+func _maj_boucle() -> void:
+	var r: Reglages = reg
+	for t in sc.traits:
+		r = (t as TraitDessin).reglages
+		break
+	sc.reduction_boucle = r.reduction
+	sc.torsion_boucle = r.torsion
 
 
-func _cycler(cle: String, pas: int) -> void:
-	var total: int = 1
-	match cle:
-		"genre":
-			total = Tables.GENRES.size()
-		"palette":
-			total = Tables.PALETTES.size()
-		"relief":
-			total = Tables.RELIEFS.size()
-		"mode":
-			total = Tables.MODES_COULEUR.size()
-	etat[cle] = (int(etat[cle]) + pas + total) % total
+func set_relief(i: int) -> void:
+	sc.rel_mode = i
+	sc.demander_rec_differe(0.2)
+
+
+func set_relief_h(v: float) -> void:
+	sc.rel_h = v
+	sc.demander_rec_differe(0.35)
+
+
+func set_relief_lum(v: float) -> void:
+	sc.rel_lum = v
+	sc.demander_rec_differe(0.35)
+
+
+func set_fond(i: int) -> void:
+	sc.fond = i
+	sc.appliquer_fond(env)
+
+
+func set_mouvement(i: int) -> void:
+	sc.mouvement = i
+	_maj_boucle()
+	if i != 0:
+		sc.anime = true
+	panneau.rafraichir()
+
+
+func set_vitesse(v: float) -> void:
+	sc.vitesse = v
+
+
+func set_sol(on: bool) -> void:
+	sol_visible = on
+	sol.visible = on
+	_prefs_a_sauver()
+
+
+func set_lumineux(on: bool) -> void:
+	sc.lumineux = on
+	sc.appliquer_materiaux()
+	_prefs_a_sauver()
+
+
+func set_fx(cle: String, v: float) -> void:
+	sc.fx[cle] = v
+	sc.appliquer_fx()
+	_prefs_a_sauver()
+
+
+func preset_fx(nom: String) -> void:
+	var f: Dictionary = Presets.fx(nom)
+	for k in f.keys():
+		sc.fx[k] = f[k]
+	sc.appliquer_fx()
+	panneau.rafraichir()
+	message("Ambiance : " + nom)
+	_prefs_a_sauver()
+
+
+func set_qualite(i: int) -> void:
+	qualite = i
+	sc.budget = int(BUDGETS[i])
+	sc.demander_rec_differe(0.2)
+	_prefs_a_sauver()
+
+
+func ajouter_palette_perso(cols: PackedColorArray) -> void:
+	var n: int = Tables.nb_perso + 1
+	var idx: int = Tables.ajouter_palette("Perso %d" % n, cols)
+	panneau.palettes_changees()
+	regler("palette", idx)
+	panneau.rafraichir()
+	message("Palette Perso %d creee" % n)
+	_prefs_a_sauver()
+
+
+# ---------------------------------------------------------------- scenes
+
+func _appliquer_config(c: Dictionary) -> void:
+	reg = (c["reglages"] as Reglages).copie()
+	sc.rel_mode = int(c["rel_mode"])
+	sc.rel_h = float(c["rel_h"])
+	sc.rel_lum = float(c["rel_lum"])
+	sc.mouvement = int(c["mouvement"])
+	sc.vitesse = float(c["vitesse"])
+	sc.fond = int(c["fond"])
+	var fxd: Dictionary = c["fx"]
+	for k in fxd.keys():
+		sc.fx[k] = fxd[k]
+	sc.appliquer_fx()
+	sc.anime = true
+	var traits: Array = Generateur.composer_scene(reg, RM, rng)
+	sc.installer(traits)
+	sc.appliquer_fond(env)
+	_maj_boucle()
 	_maj_hud()
-	match cle:
-		"genre":
-			_msg("Genre : " + str(Tables.GENRES[int(etat[cle])]["nom"]))
-		"palette":
-			_msg("Palette : " + str(Tables.PALETTES[int(etat[cle])][0]))
-		"relief":
-			_msg("Relief : " + str(Tables.RELIEFS[int(etat[cle])]))
-		"mode":
-			_msg("Couleur : " + str(Tables.MODES_COULEUR[int(etat[cle])]))
-	_demander_rec()
+	panneau.rafraichir()
 
 
-func _cycler_n() -> void:
-	var k: int = Tables.N_VALEURS.find(int(etat["n"]))
-	k = (k + 1) % Tables.N_VALEURS.size()
-	etat["n"] = int(Tables.N_VALEURS[k])
-	_maj_hud()
-	_msg("%d branches" % int(etat["n"]))
-	_demander_rec()
+func scene_livree(i: int) -> void:
+	diff_stop()
+	var l: Array = Generateur.configs_livrees()
+	var c: Dictionary = l[i]
+	_appliquer_config(c)
+	message(str(c["nom"]))
 
 
-# ------------------------------------------------- construction (thread)
-
-func _stride() -> int:
-	var genre: Dictionary = Tables.GENRES[int(etat["genre"])]
-	var nc: int = (genre["copies"] as Array).size()
-	var nm: int = 2 if bool(genre["miroir"]) else 1
-	var total: int = 0
-	for t in traits:
-		total += (t["pts"] as PackedVector2Array).size() - 1
-	total *= int(etat["n"]) * nm * nc
-	return maxi(1, ceili(float(total) / float(BUDGET_QUADS)))
+func hasard() -> void:
+	if _diff_actif:
+		diff_stop()
+	var c: Dictionary = Generateur.tirage(rng, "Hasard")
+	_appliquer_config(c)
+	message("%s - %s" % [str(Tables.GENRES[reg.genre][0]), str(Tables.palettes[reg.palette]["nom"])])
 
 
-func _demander_rec() -> void:
-	if traits.is_empty():
-		return
-	if _occupe:
-		_relancer = true
-		return
-	_lancer()
+func vierge() -> void:
+	sc.vider()
+	message("Toile vierge")
 
 
-func _lancer() -> void:
-	_occupe = true
-	_relancer = false
-	var donnees: Array = []
-	for t in traits:
-		donnees.append(t["pts"])
-	var par: Dictionary = _params()
-	_thread = Thread.new()
-	_thread.start(_travail.bind(donnees, par, _stride()))
+func annuler() -> void:
+	if sc.annuler():
+		message("Annule")
 
 
-func _travail(donnees: Array, par: Dictionary, stride: int) -> Array:
-	var out: Array = []
-	for i in donnees.size():
-		out.append(Builder.construire(donnees[i], i, par, stride))
-	return out
+func retour_depart() -> void:
+	origine.global_transform = Transform3D(Basis(), Vector3.ZERO)
 
 
-func _creer_noeud(r: int, d: Dictionary) -> MeshInstance3D:
-	var mesh: ArrayMesh = ArrayMesh.new()
-	_surface(mesh, d)
-	var nd: MeshInstance3D = MeshInstance3D.new()
-	nd.mesh = mesh
-	nd.material_override = mat_ruban
-	nd.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	(anneaux[r] as Node3D).add_child(nd)
-	return nd
-
-
-func _surface(mesh: ArrayMesh, d: Dictionary) -> void:
-	if (d["v"] as PackedVector3Array).size() == 0:
-		return
-	var arr: Array = []
-	arr.resize(Mesh.ARRAY_MAX)
-	arr[Mesh.ARRAY_VERTEX] = d["v"]
-	arr[Mesh.ARRAY_NORMAL] = d["n"]
-	arr[Mesh.ARRAY_COLOR] = d["c"]
-	arr[Mesh.ARRAY_TEX_UV] = d["uv"]
-	arr[Mesh.ARRAY_INDEX] = d["i"]
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
-
-
-func _suivi_thread() -> void:
-	if _thread != null and not _thread.is_alive():
-		var res: Array = _thread.wait_to_finish()
-		_thread = null
-		_file.clear()
-		_nouveaux = []
-		for i in traits.size():
-			_nouveaux.append([])
-		for i in res.size():
-			var par_anneau: Array = res[i]
-			for r in 3:
-				var d: Dictionary = par_anneau[r]
-				if (d["v"] as PackedVector3Array).size() > 0:
-					_file.append([i, r, d])
-		_creation = true
-	if _creation:
-		var k: int = 0
-		while k < 6 and not _file.is_empty():
-			var it: Array = _file.pop_front()
-			var nd: MeshInstance3D = _creer_noeud(int(it[1]), it[2])
-			nd.visible = false
-			(_nouveaux[int(it[0])] as Array).append(nd)
-			k += 1
-		if _file.is_empty():
-			_finir_creation()
-
-
-func _finir_creation() -> void:
-	for i in traits.size():
-		for nd in (traits[i]["nodes"] as Array):
-			(nd as Node).queue_free()
-		var nv: Array = _nouveaux[i]
-		for nd in nv:
-			(nd as Node3D).visible = true
-		traits[i]["nodes"] = nv
-	_nouveaux = []
-	_creation = false
-	_occupe = false
-	var fns: Array = _differe.duplicate()
-	_differe.clear()
-	for f in fns:
-		(f as Callable).call()
-	if _relancer and not _occupe:
-		_demander_rec()
-
-
-# --------------------------------------------------------------- dessin
-
-func _ecart(p: Vector3, rel: int) -> float:
-	var u: float = minf(Vector2(p.x, p.y).length() / Tables.R_METRES, 1.0)
-	return p.z - Tables.H_METRES * Tables.relief_z(rel, u)
-
-
-func _viser(o_w: Vector3, d_w: Vector3) -> Variant:
-	var inv: Transform3D = monde.global_transform.affine_inverse()
-	var o: Vector3 = inv * o_w
-	var d: Vector3 = (inv.basis * d_w).normalized()
-	var rel: int = int(etat["relief"])
-	var t: float = 0.1
-	var prev: float = _ecart(o + d * t, rel)
-	while t < 80.0:
-		var t2: float = t + 0.12
-		var cur: float = _ecart(o + d * t2, rel)
-		if prev * cur <= 0.0 and prev != cur:
-			var a: float = t
-			var b: float = t2
-			for _k in 14:
-				var mid: float = 0.5 * (a + b)
-				var fm: float = _ecart(o + d * mid, rel)
-				if fm * prev <= 0.0:
-					b = mid
-				else:
-					a = mid
-			var pt: Vector3 = o + d * (0.5 * (a + b))
-			var R: float = Tables.R_METRES
-			if Vector2(pt.x, pt.y).length() / R <= 1.0:
-				return Vector2(pt.x / R, pt.y / R)
-		prev = cur
-		t = t2
-	return null
-
-
-func _debut_trace() -> void:
-	_trace = true
-	_live_pts = PackedVector2Array()
-	_live_long = 0.0
-	_live_acc = [Builder.vide(), Builder.vide(), Builder.vide()]
-	_live_nodes = []
-	for r in 3:
-		_live_nodes.append(_creer_noeud(r, Builder.vide()))
-	_aide_temps = 0.0
-
-
-func _ajouter_point(p: Vector2) -> void:
-	var n: int = _live_pts.size()
-	if n > 0 and p.distance_to(_live_pts[n - 1]) < PAS_TRACE:
-		return
-	if n >= MAX_LIVE_PTS:
-		return
-	_live_pts.append(p)
-	if n > 0:
-		var a: Vector2 = _live_pts[n - 1]
-		var seg: PackedVector2Array = PackedVector2Array([a, p])
-		var res: Array = Builder.construire(seg, traits.size(), _params(), 1, _live_long, 3.0)
-		_live_long += a.distance_to(p)
-		for r in 3:
-			Builder.fusionner(_live_acc[r], res[r])
-		_live_dirty = true
-
-
-func _maj_live(forcer: bool) -> void:
-	if not _live_dirty:
-		return
-	if not forcer and _live_chrono < 0.1:
-		return
-	_live_chrono = 0.0
-	_live_dirty = false
-	for r in 3:
-		var mesh: ArrayMesh = (_live_nodes[r] as MeshInstance3D).mesh as ArrayMesh
-		mesh.clear_surfaces()
-		_surface(mesh, _live_acc[r])
-
-
-func _fin_trace() -> void:
-	_trace = false
-	_maj_live(true)
-	if _live_pts.size() < 3:
-		for nd in _live_nodes:
-			(nd as Node).queue_free()
+func _cycler(champ: String, pas: int, total: int, nom: String) -> void:
+	var v: int = (int(reg.get(champ)) + pas + total) % total
+	regler(champ, v)
+	panneau.rafraichir()
+	if champ == "genre":
+		message("Genre : " + str(Tables.GENRES[v][0]))
+	elif champ == "palette":
+		message("Palette : " + str(Tables.palettes[v]["nom"]))
 	else:
-		traits.append({"pts": _live_pts.duplicate(), "nodes": _live_nodes.duplicate()})
-		while traits.size() > MAX_TRAITS:
-			var vieux: Dictionary = traits.pop_front()
-			for nd in (vieux["nodes"] as Array):
-				(nd as Node).queue_free()
-	_live_nodes = []
-	_live_pts = PackedVector2Array()
-	_live_acc = []
+		message("%s : %s" % [nom, str(Tables.NOMS_MODES[v])])
 
 
-func _annuler() -> void:
-	if _occupe or _trace or traits.is_empty():
+# ------------------------------------------------------- creations / listes
+
+func sauver() -> void:
+	var nom: String = "%s - %s" % [str(Tables.GENRES[reg.genre][0]), Time.get_datetime_string_from_system().replace("T", " ").substr(5, 11)]
+	var id: String = Stockage.ecrire(Oeuvre.encoder(nom, sc))
+	message("Enregistre : " + nom if id != "" else "Echec de l'enregistrement")
+
+
+func _charger_sans_message(id: String) -> bool:
+	var o: Dictionary = Oeuvre.decoder(Stockage.lire(id))
+	if o.is_empty():
+		return false
+	Oeuvre.appliquer(o, sc)
+	sc.appliquer_fond(env)
+	sc.anime = true
+	for t in sc.traits:
+		reg = (t as TraitDessin).reglages.copie()
+		break
+	_maj_boucle()
+	_maj_hud()
+	panneau.palettes_changees()
+	panneau.rafraichir()
+	return true
+
+
+func charger(id: String) -> void:
+	diff_stop()
+	if _charger_sans_message(id):
+		message("Charge : " + Stockage.nom_de(id))
+	else:
+		message("Creation illisible")
+
+
+func coller() -> void:
+	var txt: String = DisplayServer.clipboard_get()
+	var o: Dictionary = Oeuvre.decoder(txt)
+	if o.is_empty() or (o["traits"] as Array).is_empty():
+		message("Presse-papiers : pas de creation valide")
 		return
-	var t: Dictionary = traits.pop_back()
-	for nd in (t["nodes"] as Array):
-		(nd as Node).queue_free()
-	_msg("Annulé")
+	diff_stop()
+	Oeuvre.appliquer(o, sc)
+	sc.appliquer_fond(env)
+	for t in sc.traits:
+		reg = (t as TraitDessin).reglages.copie()
+		break
+	_maj_boucle()
+	_maj_hud()
+	panneau.palettes_changees()
+	panneau.rafraichir()
+	Stockage.ecrire(txt)
+	message("Creation collee et enregistree")
+
+
+func supprimer(id: String) -> void:
+	Stockage.supprimer(id)
+	message("Supprime")
+
+
+func liste_nouvelle() -> void:
+	var l: Array = Stockage.listes()
+	l.append({"n": "Liste %d" % (l.size() + 1), "t": 1, "o": []})
+	Stockage.sauver_listes(l)
+
+
+func liste_supprimer(i: int) -> void:
+	var l: Array = Stockage.listes()
+	if i >= 0 and i < l.size():
+		l.remove_at(i)
+		Stockage.sauver_listes(l)
+
+
+func liste_ajouter(i: int, id: String) -> void:
+	var l: Array = Stockage.listes()
+	if i < 0 or i >= l.size():
+		return
+	var o: Array = (l[i] as Dictionary)["o"]
+	for s in o:
+		if str((s as Dictionary).get("c", "")) == id:
+			message("Deja dans la liste")
+			return
+	o.append({"c": id, "d": 0.0, "m": -1})
+	Stockage.sauver_listes(l)
+	message("Ajoute a la liste")
+
+
+func diff_transition(i: int) -> int:
+	var l: Array = Stockage.listes()
+	if i >= 0 and i < l.size():
+		return int((l[i] as Dictionary).get("t", 1))
+	return 1
+
+
+func diff_set_transition(i: int, t: int) -> void:
+	var l: Array = Stockage.listes()
+	if i >= 0 and i < l.size():
+		(l[i] as Dictionary)["t"] = t
+		Stockage.sauver_listes(l)
+
+
+func seq_regler(i: int, k: int, champ: String, v: Variant) -> void:
+	var l: Array = Stockage.listes()
+	if i < 0 or i >= l.size():
+		return
+	var o: Array = (l[i] as Dictionary)["o"]
+	if k >= 0 and k < o.size():
+		(o[k] as Dictionary)[champ] = v
+		Stockage.sauver_listes(l)
+
+
+func seq_deplacer(i: int, k: int, sens: int) -> void:
+	var l: Array = Stockage.listes()
+	if i < 0 or i >= l.size():
+		return
+	var o: Array = (l[i] as Dictionary)["o"]
+	var k2: int = k + sens
+	if k >= 0 and k < o.size() and k2 >= 0 and k2 < o.size():
+		var tmp: Variant = o[k]
+		o[k] = o[k2]
+		o[k2] = tmp
+		Stockage.sauver_listes(l)
+
+
+func seq_retirer(i: int, k: int) -> void:
+	var l: Array = Stockage.listes()
+	if i < 0 or i >= l.size():
+		return
+	var o: Array = (l[i] as Dictionary)["o"]
+	if k >= 0 and k < o.size():
+		o.remove_at(k)
+		Stockage.sauver_listes(l)
+
+
+# ------------------------------------------------------------- diffusion
+
+func diff_lire(i: int) -> void:
+	var l: Array = Stockage.listes()
+	if i < 0 or i >= l.size() or ((l[i] as Dictionary)["o"] as Array).is_empty():
+		message("Liste vide")
+		return
+	_diff_actif = true
+	_diff_vizu = false
+	_diff_liste = i
+	_diff_i = -1
+	_diff_suite = 1
+	_diff_avancer()
+	message("Diffusion : " + str((l[i] as Dictionary)["n"]))
+
+
+func vizu_lancer() -> void:
+	_diff_actif = true
+	_diff_vizu = true
+	_diff_i = -1
+	_diff_avancer()
+	message("Vizu automatique")
+
+
+func diff_stop() -> void:
+	if not _diff_actif:
+		return
+	_diff_actif = false
+	_diff_phase = 0
+	_voile_mat.albedo_color = Color(0, 0, 0, 0)
+	_voile.visible = false
+	_maj_hud()
+
+
+func diff_pas(sens: int) -> void:
+	if not _diff_actif:
+		return
+	_diff_suite = sens
+	_diff_avancer()
+
+
+func _diff_avancer() -> void:
+	# lance la transition vers l'element suivant
+	var t: int = 1
+	if not _diff_vizu:
+		t = diff_transition(_diff_liste)
+	if t == 0 or _diff_i < 0:
+		_diff_charger_suivant()
+		_diff_phase = 0
+		return
+	_diff_phase = 1
+	_diff_phase_t = 0.0
+
+
+func _diff_charger_suivant() -> void:
+	_diff_t = 0.0
+	if _diff_vizu:
+		var c: Dictionary = Generateur.tirage(rng, "Vizu", true)
+		_appliquer_config(c)
+		_diff_dur = vizu_duree
+		_diff_i += 1
+		return
+	var l: Array = Stockage.listes()
+	if _diff_liste >= l.size():
+		diff_stop()
+		return
+	var o: Array = (l[_diff_liste] as Dictionary)["o"]
+	if o.is_empty():
+		diff_stop()
+		return
+	var essais: int = 0
+	while essais < o.size():
+		_diff_i = posmod(_diff_i + _diff_suite, o.size())
+		var s: Dictionary = o[_diff_i]
+		if _charger_sans_message(str(s.get("c", ""))):
+			var d: float = float(s.get("d", 0.0))
+			_diff_dur = d if d > 0.0 else duree_defaut
+			var mv: int = int(s.get("m", -1))
+			if mv >= 0 and mv < Tables.NOMS_MOUVEMENTS.size():
+				sc.mouvement = mv
+				sc.anime = true
+				_maj_boucle()
+			message("%d/%d  %s" % [_diff_i + 1, o.size(), Stockage.nom_de(str(s.get("c", "")))])
+			return
+		essais += 1
+	diff_stop()
+
+
+func _diff_maj(dt: float) -> void:
+	if not _diff_actif:
+		return
+	if _diff_phase == 0:
+		_diff_t += dt
+		if _diff_t >= _diff_dur and not sc.occupe:
+			_diff_suite = 1
+			_diff_avancer()
+		return
+	var duree_f: float = 0.9
+	if not _diff_vizu and diff_transition(_diff_liste) == 2:
+		duree_f = 0.45
+	_diff_phase_t += dt
+	_voile.visible = true
+	if _diff_phase == 1:
+		var a: float = clampf(_diff_phase_t / duree_f, 0.0, 1.0)
+		_voile_mat.albedo_color = Color(0, 0, 0, a)
+		if a >= 1.0:
+			_diff_charger_suivant()
+			_diff_phase = 3
+			_diff_phase_t = 0.0
+	elif _diff_phase == 3:
+		if sc.occupe and _diff_phase_t < 6.0:
+			return
+		var a2: float = 1.0 - clampf(_diff_phase_t / duree_f, 0.0, 1.0)
+		_voile_mat.albedo_color = Color(0, 0, 0, a2)
+		if a2 <= 0.0:
+			_voile.visible = false
+			_diff_phase = 0
 
 
 # ------------------------------------------------------------- entrées
@@ -535,6 +721,29 @@ func _tourner(deg: float) -> void:
 	origine.global_transform = o
 
 
+func _placer_panneau() -> void:
+	var cam: Vector3 = camera.global_position
+	var avant: Vector3 = -camera.global_transform.basis.z
+	avant.y = 0.0
+	if avant.length() < 0.01:
+		avant = Vector3(0, 0, -1)
+	avant = avant.normalized()
+	var pos: Vector3 = cam + avant * 1.35
+	pos.y = cam.y - 0.05
+	panneau.global_transform = Transform3D(Basis.looking_at(avant, Vector3.UP), pos)
+
+
+func basculer_panneau() -> void:
+	panneau.visible = not panneau.visible
+	if panneau.visible:
+		_placer_panneau()
+		panneau.rafraichir()
+		_aide.visible = false
+	else:
+		panneau.quitter()
+	panneau.vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS if panneau.visible else SubViewport.UPDATE_DISABLED
+
+
 func _entrees(dt: float) -> void:
 	var mv: Vector2 = main_g.get_vector2("primary")
 	if mv.length() < 0.15:
@@ -546,101 +755,112 @@ func _entrees(dt: float) -> void:
 		origine.global_position += dir * VITESSE_VOL * boost * dt
 
 	var dr: Vector2 = main_d.get_vector2("primary")
-	if absf(dr.x) < 0.3:
-		_tour_libre = true
-	elif absf(dr.x) > 0.7 and _tour_libre:
-		_tour_libre = false
-		_tourner(-30.0 * signf(dr.x))
-	if absf(dr.y) > 0.2:
-		origine.global_position.y += dr.y * 2.5 * dt
+	var sur_panneau: bool = false
+	var gachette: bool = _seuil("trigger_d", main_d.get_float("trigger"))
+	var o_ray: Vector3 = main_d.global_position
+	var d_ray: Vector3 = -main_d.global_transform.basis.z
 
-	if _front("d_a", main_d.is_button_pressed("ax_button")):
-		_cycler("genre", 1)
-	if _front("d_b", main_d.is_button_pressed("by_button")):
-		_cycler("palette", 1)
-	if _front("g_x", main_g.is_button_pressed("ax_button")):
-		_cycler("relief", 1)
-	if _front("g_y", main_g.is_button_pressed("by_button")):
-		_cycler("mode", 1)
-	if _front("d_clic", main_d.is_button_pressed("primary_click")):
-		_nouvelle_scene(-1)
-	if _front("g_clic", main_g.is_button_pressed("primary_click")):
-		_cycler_n()
+	var longueur: float = 3.0
+	var hit_panneau: Variant = null
+	if panneau.visible:
+		hit_panneau = panneau.intersecter(o_ray, d_ray)
+	var hit: Variant = sc.viser(o_ray, d_ray)
+
+	if hit_panneau != null:
+		var hp: Dictionary = hit_panneau
+		sur_panneau = true
+		panneau.souris(hp["px"], gachette)
+		longueur = float(hp["t"])
+		_curseur.visible = true
+		_curseur.scale = Vector3(0.25, 0.25, 0.25)
+		_curseur.global_position = hp["mondial"]
+		if absf(dr.y) > 0.5:
+			if _front("molette", true) or true:
+				var pas: float = dt * 4.0
+				_bouts["mol"] = float(_bouts.get("mol", 0.0)) + pas
+				if float(_bouts["mol"]) > 0.12:
+					_bouts["mol"] = 0.0
+					panneau.molette(dr.y > 0.0, hp["px"])
+	else:
+		panneau.quitter()
+		_curseur.scale = Vector3.ONE
+		if hit != null:
+			var pt: Vector3 = hit
+			_curseur.visible = true
+			_curseur.global_position = sc.to_global(pt)
+			longueur = maxf(0.1, o_ray.distance_to(sc.to_global(pt)))
+		else:
+			_curseur.visible = false
+	_rayon.scale = Vector3(1.0, 1.0, longueur)
+	_rayon.position = Vector3(0.0, 0.0, -longueur * 0.5)
+
+	# rotation / altitude (sauf quand le stick sert a defiler le menu)
+	if not sur_panneau:
+		if absf(dr.x) < 0.3:
+			_tour_libre = true
+		elif absf(dr.x) > 0.7 and _tour_libre:
+			_tour_libre = false
+			_tourner(-30.0 * signf(dr.x))
+		if absf(dr.y) > 0.2:
+			origine.global_position.y += dr.y * 2.5 * dt
+	else:
+		if absf(dr.x) < 0.3:
+			_tour_libre = true
+
 	if _front("g_menu", main_g.is_button_pressed("menu_button")):
-		anime = not anime
-		_msg("Animation : " + ("oui" if anime else "non"))
+		basculer_panneau()
+	if _front("d_a", main_d.is_button_pressed("ax_button")):
+		_cycler("genre", 1, Tables.GENRES.size(), "Genre")
+	if _front("d_b", main_d.is_button_pressed("by_button")):
+		_cycler("palette", 1, Tables.palettes.size(), "Palette")
+	if _front("g_x", main_g.is_button_pressed("ax_button")):
+		_cycler("mode", 1, Tables.NOMS_MODES.size(), "Couleurs")
+	if _front("g_y", main_g.is_button_pressed("by_button")):
+		var ni: int = (sc.rel_mode + 1) % Tables.NOMS_RELIEFS.size()
+		set_relief(ni)
+		panneau.rafraichir()
+		message("Relief : " + str(Tables.NOMS_RELIEFS[ni]))
+	if _front("d_clic", main_d.is_button_pressed("primary_click")):
+		hasard()
+	if _front("g_clic", main_g.is_button_pressed("primary_click")):
+		sc.anime = not sc.anime
+		message("Animation : " + ("oui" if sc.anime else "pause"))
 
 	var grip_d: bool = _seuil("grip_d", main_d.get_float("grip"))
 	var grip_g: bool = _seuil("grip_g", main_g.get_float("grip"))
 	if _front("grip_d_f", grip_d):
 		if not grip_g:
-			_annuler()
+			annuler()
 		else:
-			_toile_vierge()
+			vierge()
 	if _front("grip_g_f", grip_g):
 		if grip_d:
-			_toile_vierge()
+			vierge()
 		else:
-			origine.global_transform = Transform3D(Basis(), Vector3.ZERO)
+			retour_depart()
 
-	_veut_tracer = _seuil("trigger_d", main_d.get_float("trigger"))
-	var hit: Variant = _viser(main_d.global_position, -main_d.global_transform.basis.z)
-	var longueur: float = 3.0
-	if hit != null:
-		var pu: Vector2 = hit
-		var wpos: Vector3 = monde.to_global(Vector3(
-			pu.x * Tables.R_METRES, pu.y * Tables.R_METRES,
-			Tables.H_METRES * Tables.relief_z(int(etat["relief"]), pu.length())))
-		_curseur.visible = true
-		_curseur.global_position = wpos
-		longueur = maxf(0.1, main_d.global_position.distance_to(wpos))
-	else:
-		_curseur.visible = false
-	_rayon.scale = Vector3(1.0, 1.0, longueur)
-	_rayon.position = Vector3(0.0, 0.0, -longueur * 0.5)
-
-	if _veut_tracer and not _occupe and _aligne():
-		if hit != null:
-			if not _trace:
-				_debut_trace()
-			_ajouter_point(hit)
-		elif _trace:
-			_fin_trace()
-	elif _trace and not _veut_tracer:
-		_fin_trace()
+	# dessin
+	var veut: bool = gachette and not sur_panneau and not panneau_bloque()
+	if veut and hit != null:
+		var pt2: Vector3 = hit
+		if not sc.live_actif():
+			_live_k = sc.calque_de(pt2)
+			sc.live_debut(reg.copie(), _live_k)
+			_aide_temps = 0.0
+		sc.live_point(sc.vers_local(_live_k, pt2))
+	elif sc.live_actif():
+		sc.live_fin()
 
 
-func _aligne() -> bool:
-	for a in anneaux:
-		var ang: float = (a as Node3D).rotation.z
-		if absf(ang - roundf(ang / TAU) * TAU) > 0.01:
-			return false
-	return true
-
-
-func _animer(dt: float) -> void:
-	var fixer: bool = _veut_tracer or _trace
-	for i in anneaux.size():
-		var nd: Node3D = anneaux[i]
-		var a: float = nd.rotation.z
-		if fixer:
-			var cible: float = roundf(a / TAU) * TAU
-			a += (cible - a) * minf(1.0, 8.0 * dt)
-			if absf(cible - a) < 0.002:
-				a = cible
-		elif anime:
-			a += float(vit_anneaux[i]) * dt
-		nd.rotation.z = wrapf(a, -PI, PI)
+func panneau_bloque() -> bool:
+	return false
 
 
 func _process(dt: float) -> void:
 	if main_d == null:
 		return
 	_entrees(dt)
-	_animer(dt)
-	_live_chrono += dt
-	_maj_live(false)
-	_suivi_thread()
+	_diff_maj(dt)
 	if _msg_temps > 0.0:
 		_msg_temps -= dt
 		if _msg_temps <= 0.0:
@@ -649,3 +869,8 @@ func _process(dt: float) -> void:
 		_aide_temps -= dt
 		if _aide_temps <= 0.0:
 			_aide.visible = false
+	if _prefs_sale:
+		_prefs_chrono -= dt
+		if _prefs_chrono <= 0.0:
+			_prefs_sale = false
+			_sauver_prefs()
