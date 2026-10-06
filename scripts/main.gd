@@ -663,7 +663,26 @@ func vizu_lancer() -> void:
 	message("Vizu automatique")
 
 
+var _vizu_avant: float = -1.0
+
+
+## Seance : scenes lentes qui s'enchainent, le mandala respire, son apaisant.
+func seance_meditation() -> void:
+	if _vizu_avant < 0.0:
+		_vizu_avant = vizu_duree
+	vizu_duree = maxf(vizu_duree, 45.0)
+	sc.souffle_periode = 10.0
+	set_souffle(true)
+	if son.ambiance == 0:
+		son.choisir_ambiance(4)
+	vizu_lancer()
+	message("Seance de meditation")
+
+
 func diff_stop() -> void:
+	if _vizu_avant >= 0.0:
+		vizu_duree = _vizu_avant
+		_vizu_avant = -1.0
 	if not _diff_actif:
 		return
 	_diff_actif = false
