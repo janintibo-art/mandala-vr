@@ -1,15 +1,17 @@
 class_name V26Manager
 extends Node
-## Mandala VR v26 : menu a la maniere de la version telephone.
-## Navigation par pastilles sur deux niveaux (au lieu de 14 onglets alignes)
-## et barre d'actions toujours visible (annuler, hasard, enregistrer...).
+## Mandala VR v26/v34 : navigation principale unifiee.
+## v34 : Accueil, Creer, Univers, Experiences, Galerie et Reglages deviennent
+## les familles officielles. Les pages inconnues ne sont plus melangees au dernier
+## groupe et la barre d'actions de creation n'apparait plus dans les experiences.
 
 const GROUPES: Array = [
+	["Accueil", ["Accueil"]],
 	["Creer", ["Rapide", "Modeles", "Genres", "Trait"]],
-	["Couleur", ["Couleurs", "Lumiere", "Style"]],
-	["Bouger", ["Mouvement", "Relief", "Sensations"]],
-	["Univers", ["Monde", "Diffusion", "Creations"]],
-	["Plus", ["V8"]],
+	["Univers", ["Couleurs", "Lumiere", "Style", "Eclat", "Monde"]],
+	["Experiences", ["Sensations", "Course", "Diffusion"]],
+	["Galerie", ["Creations"]],
+	["Reglages", ["Mouvement", "Relief", "V8"]],
 ]
 const VIOLET: Color = Color(0.48, 0.45, 0.84)
 
@@ -72,6 +74,7 @@ func _installer() -> void:
 	_rang_pages = HBoxContainer.new()
 	_rang_pages.add_theme_constant_override("separation", 8)
 	_nav.add_child(_rang_pages)
+
 	for i in GROUPES.size():
 		var b: Button = Button.new()
 		b.text = str((GROUPES[i] as Array)[0])
@@ -82,6 +85,7 @@ func _installer() -> void:
 		b.pressed.connect(_choisir_groupe.bind(i))
 		_rang_groupes.add_child(b)
 		_btn_groupes.append(b)
+
 	col.add_child(_nav)
 	col.move_child(_nav, o.get_index())
 
@@ -100,14 +104,14 @@ func _installer() -> void:
 		b2.add_theme_font_size_override("font_size", 24)
 		b2.pressed.connect(Callable(self, str(a[1])))
 		_barre.add_child(b2)
+
 	col.add_child(_barre)
 	col.move_child(_barre, app.panneau._bas.get_index())
 
 	_synchroniser()
-	app.message("Menu v26 : navigation en pastilles")
+	app.message("Menu v34 : navigation unifiee")
 
 
-## Style pastille : tres arrondi, halo violet quand elle est choisie.
 func _pastille(b: Button, rayon: int, taille: int) -> void:
 	b.add_theme_font_size_override("font_size", taille)
 	for etat in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
@@ -131,29 +135,28 @@ func _pastille(b: Button, rayon: int, taille: int) -> void:
 	b.add_theme_color_override("font_hover_pressed_color", Color.WHITE)
 
 
-## Pages (noeuds du TabContainer) de chaque groupe, "Plus" recevant les pages inconnues.
 func _pages_du_groupe(g: int) -> Array:
+	if g < 0 or g >= GROUPES.size():
+		return []
 	var o: TabContainer = app.panneau.onglets
 	var noms: Array = (GROUPES[g] as Array)[1]
 	var out: Array = []
 	for i in o.get_child_count():
 		var nom: String = str(o.get_child(i).name)
-		var connu: bool = false
-		for gg in GROUPES.size():
-			if ((GROUPES[gg] as Array)[1] as Array).has(nom):
-				connu = true
-		if noms.has(nom) or (g == GROUPES.size() - 1 and not connu):
+		if noms.has(nom):
 			out.append(i)
 	return out
 
 
 func _groupe_de_page(i: int) -> int:
 	var o: TabContainer = app.panneau.onglets
+	if i < 0 or i >= o.get_child_count():
+		return -1
 	var nom: String = str(o.get_child(i).name)
 	for g in GROUPES.size():
 		if ((GROUPES[g] as Array)[1] as Array).has(nom):
 			return g
-	return GROUPES.size() - 1
+	return -1
 
 
 func _choisir_groupe(g: int) -> void:
@@ -171,16 +174,18 @@ func _choisir_page(i: int) -> void:
 	_synchroniser()
 
 
-## Garde les pastilles alignees sur la page affichee (et les pages ajoutees en retard).
 func _synchroniser() -> void:
 	var o: TabContainer = app.panneau.onglets
+
 	if o.current_tab >= 0 and o.get_child_count() > 0:
 		var gc: int = _groupe_de_page(o.current_tab)
 		if gc != _groupe:
 			_groupe = gc
 			_nb_pages = -1
+
 	for i in _btn_groupes.size():
 		(_btn_groupes[i] as Button).set_pressed_no_signal(i == _groupe)
+
 	var pages: Array = _pages_du_groupe(_groupe)
 	if pages.size() != _nb_pages or _rang_pages.get_child_count() != pages.size():
 		_nb_pages = pages.size()
@@ -196,10 +201,15 @@ func _synchroniser() -> void:
 			_pastille(b, 22, 24)
 			b.pressed.connect(_choisir_page.bind(int(idx)))
 			_rang_pages.add_child(b)
+
 	_rang_pages.visible = pages.size() > 1
 	for k in _rang_pages.get_child_count():
 		if k < pages.size():
 			(_rang_pages.get_child(k) as Button).set_pressed_no_signal(int(pages[k]) == o.current_tab)
+
+	# La barre Annuler / Hasard / Toile vierge n'a de sens que pour la creation.
+	if _barre != null:
+		_barre.visible = _groupe == 1
 
 
 # ------------------------------------------------------------ barre d'actions

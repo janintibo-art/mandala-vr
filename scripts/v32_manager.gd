@@ -1,8 +1,9 @@
 class_name V32Manager
 extends Node
-## Mandala VR v32
-## - Grand 8 de la mort : rupture du tunnel, chute libre, portail et reentree.
-## - Premiere vraie page Accueil : hub vers les grandes familles de l'application.
+## Mandala VR v32/v34
+## v34 : menu Accueil integre a la navigation officielle, Grand 8 de la mort
+## en chapitres progressifs et chute libre renforcee par un puits lumineux.
+## v32 : rupture du tunnel, chute libre, portail, reentree et page Accueil.
 
 const ETAT_TUNNEL: int = 0
 const ETAT_RUPTURE: int = 1
@@ -10,9 +11,26 @@ const ETAT_CHUTE: int = 2
 const ETAT_REENTREE: int = 3
 
 const NB_CHUTE: int = 96
+const NB_ANNEAUX_CHUTE: int = 24
 const DUREE_RUPTURE: float = 0.72
-const DUREE_CHUTE: float = 3.4
 const DUREE_REENTREE: float = 2.15
+
+const NOMS_CHAPITRES: Array = [
+	"Depart controle",
+	"Spirale rouge",
+	"Plongee abyssale",
+	"Tempete geometrique",
+	"Fracture",
+	"CHAOS FINAL",
+]
+const VITESSES_CHAPITRES: Array = [27.0, 29.0, 31.0, 32.5, 34.0, 34.0]
+const COURBES_CHAPITRES: Array = [1.20, 1.34, 1.46, 1.55, 1.62, 1.65]
+const CINE_1_CHAPITRES: Array = [1, 3, 4, 5, 2, 3]
+const CINE_2_CHAPITRES: Array = [2, 5, 3, 4, 5, 4]
+const CHUTE_CHAPITRES: Array = [3.2, 3.7, 4.1, 4.5, 4.9, 5.3]
+const RUPTURE_MIN_CHAPITRES: Array = [10.0, 9.0, 8.0, 7.0, 6.0, 5.2]
+const RUPTURE_MAX_CHAPITRES: Array = [13.0, 11.5, 10.0, 9.0, 8.0, 7.0]
+const MONDES_CHAPITRES: Array = [2, 17, 4, 16, 18, 19]
 
 var app = null
 var v26 = null
@@ -23,7 +41,6 @@ var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 # Accueil
 var _page_accueil: VBoxContainer = null
 var _scroll_accueil: ScrollContainer = null
-var _btn_accueil: Button = null
 
 # Grand 8 de la mort
 var _mort: bool = false
@@ -35,6 +52,9 @@ var _etat_mort: int = ETAT_TUNNEL
 var _phase_t: float = 0.0
 var _prochaine_rupture: float = 10.0
 var _cine_t: float = 0.0
+var _chapitre: int = 0
+var _chaos: int = 0
+var _duree_chute_actuelle: float = 3.2
 var _snapshot_v31: Dictionary = {}
 
 # Chute libre
@@ -44,6 +64,9 @@ var _chute_angle: Array = []
 var _chute_rayon: Array = []
 var _chute_phase: Array = []
 var _chute_vitesse: Array = []
+var _chute_anneaux_node: MultiMeshInstance3D = null
+var _chute_anneaux_mm: MultiMesh = null
+var _chute_anneaux_phase: Array = []
 
 # Portail de reentree
 var _portail: Node3D = null
@@ -79,7 +102,6 @@ func _process(dt: float) -> void:
 			_installer()
 		return
 
-	_sync_navigation_accueil()
 
 	if _confirmation_t > 0.0:
 		_confirmation_t -= dt
@@ -113,7 +135,6 @@ func _process(dt: float) -> void:
 func _installer() -> void:
 	_installe = true
 	_creer_accueil()
-	_ajouter_bouton_accueil()
 	_creer_chute()
 	_creer_portail()
 	_ajouter_ui_mort()
@@ -124,7 +145,7 @@ func _installer() -> void:
 		app.panneau.onglets.current_tab = _scroll_accueil.get_index()
 
 	app.panneau.rafraichir()
-	app.message("v32 : Accueil + Grand 8 de la mort")
+	app.message("v34 : Accueil unifie + Grand 8 progressif")
 
 
 func _creer_accueil() -> void:
@@ -163,12 +184,12 @@ func _creer_accueil() -> void:
 	_carte(g, "SENSATIONS\nGrand 8, vertige et extreme", Color(0.72, 0.22, 0.44), func() -> void: _aller_page("Sensations"))
 	_carte(g, "MEDITATION\nRespiration et sessions", Color(0.42, 0.34, 0.78), func() -> void: _aller_page("V8"))
 	_carte(g, "DIFFUSION\nCreations en lecture automatique", Color(0.68, 0.42, 0.16), func() -> void: _aller_page("Diffusion"))
-	_carte(g, "MODE COURSE\nVehicule assiste - prochaine experience", Color(0.18, 0.34, 0.62), _course_bientot)
+	_carte(g, "MODE COURSE\nVehicule rapide avec assistance", Color(0.18, 0.34, 0.62), func() -> void: _aller_page("Course"))
 	_carte(g, "CREATIONS\nSauvegardes et galerie", Color(0.36, 0.48, 0.70), func() -> void: _aller_page("Creations"))
 	_carte(g, "REGLAGES VR\nConfort et options", Color(0.30, 0.32, 0.46), func() -> void: _aller_page("V8"))
 
 	app.panneau._note(_page_accueil,
-		"Cette page devient le hub du projet. Les futures experiences (Course, Vol, Chute infinie, Surf spatial...) pourront avoir leur propre menu sans surcharger les reglages existants.")
+		"Cette page est le hub du projet. Les experiences actuelles ont maintenant leur propre section et les futures (Vol, Chute infinie, Surf spatial...) pourront s'ajouter sans melanger les menus.")
 
 
 func _carte(parent: Control, texte: String, couleur: Color, cb: Callable) -> void:
@@ -211,29 +232,10 @@ func _carte(parent: Control, texte: String, couleur: Color, cb: Callable) -> voi
 	parent.add_child(b)
 
 
-func _ajouter_bouton_accueil() -> void:
-	var rg: Variant = v26.get("_rang_groupes")
-	if not (rg is HBoxContainer):
-		return
-
-	_btn_accueil = Button.new()
-	_btn_accueil.text = "Accueil"
-	_btn_accueil.toggle_mode = true
-	_btn_accueil.custom_minimum_size = Vector2(0, 62)
-	_btn_accueil.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	v26.call("_pastille", _btn_accueil, 30, 24)
-	_btn_accueil.pressed.connect(_aller_accueil)
-
-	var rang: HBoxContainer = rg
-	rang.add_child(_btn_accueil)
-	rang.move_child(_btn_accueil, 0)
-
-
 func _aller_accueil() -> void:
 	if _scroll_accueil == null:
 		return
 	app.panneau.onglets.current_tab = _scroll_accueil.get_index()
-	_sync_navigation_accueil()
 
 
 func _aller_page(nom: String) -> void:
@@ -247,10 +249,6 @@ func _aller_page(nom: String) -> void:
 	app.message("Menu indisponible : " + nom)
 
 
-func _course_bientot() -> void:
-	app.message("Mode Course : vehicule rapide assiste - prochaine grande experience")
-
-
 func _sur_accueil() -> bool:
 	if _scroll_accueil == null:
 		return false
@@ -258,21 +256,8 @@ func _sur_accueil() -> bool:
 
 
 func _sync_navigation_accueil() -> void:
-	if _btn_accueil == null:
-		return
-
-	var home: bool = _sur_accueil()
-	_btn_accueil.set_pressed_no_signal(home)
-
-	if home:
-		var btns: Variant = v26.get("_btn_groupes")
-		if btns is Array:
-			for b in btns:
-				if b is Button:
-					(b as Button).set_pressed_no_signal(false)
-		var rang_pages: Variant = v26.get("_rang_pages")
-		if rang_pages is HBoxContainer:
-			(rang_pages as HBoxContainer).visible = false
+	if v26 != null and v26.has_method("_synchroniser"):
+		v26.call("_synchroniser")
 
 
 # ================================================================== GRAND 8 DE LA MORT
@@ -287,7 +272,7 @@ func _ajouter_ui_mort() -> void:
 
 	app.panneau._titre(p, "Grand 8 de la mort")
 	app.panneau._note(p,
-		"Le tunnel se coupe sans prevenir. Tu tombes dans le vide, un portail reapparait plus bas puis t'aspire dans un nouveau tunnel a pleine vitesse. Les ruptures et les cinematiques changent a chaque cycle.")
+		"Le parcours evolue maintenant par chapitres. Chaque reentree augmente la vitesse, la violence des courbes et la duree de la chute, jusqu'au Chaos final. Le tunnel se coupe, tu traverses un puits lumineux puis un portail t'aspire dans le chapitre suivant.")
 
 	_btn_mort = Button.new()
 	_btn_mort.text = "GRAND 8 DE LA MORT"
@@ -335,6 +320,7 @@ func _preparer_demarrage_mort() -> void:
 		"auto": bool(v31.get("_auto_cine")),
 		"duree": float(v31.get("_duree_cine")),
 		"vignette": float(v31.get("_vignette_force")),
+		"monde": app.monde.courant,
 	}
 
 	v31.set("_profil", 2)
@@ -355,12 +341,12 @@ func _commencer_mort() -> void:
 	_etat_mort = ETAT_TUNNEL
 	_phase_t = 0.0
 	_cine_t = 0.0
-	_prochaine_rupture = _rng.randf_range(8.0, 13.0)
+	_chapitre = 0
+	_chaos = 0
 	_cacher_chute()
 	_cacher_portail()
 	_tunnel_visible(true)
-	_choisir_cine_mort()
-	app.message("GRAND 8 DE LA MORT")
+	_appliquer_chapitre()
 
 
 func arreter_mort() -> void:
@@ -390,6 +376,8 @@ func _restaurer_reglages_v31() -> void:
 	v31.set("_auto_cine", bool(_snapshot_v31.get("auto", true)))
 	v31.set("_duree_cine", float(_snapshot_v31.get("duree", 10.0)))
 	v31.set("_vignette_force", float(_snapshot_v31.get("vignette", 0.35)))
+	if app != null:
+		app.set_monde(int(_snapshot_v31.get("monde", app.monde.courant)))
 	_snapshot_v31 = {}
 
 
@@ -407,27 +395,53 @@ func _maj_mort(dt: float) -> void:
 			_maj_reentree()
 
 
+func _appliquer_chapitre() -> void:
+	var dernier: int = NOMS_CHAPITRES.size() - 1
+	var idx: int = mini(_chapitre, dernier)
+	var bonus: float = float(_chaos) if idx == dernier else 0.0
+
+	var vitesse: float = minf(34.0, float(VITESSES_CHAPITRES[idx]) + bonus * 0.45)
+	var courbes: float = minf(1.65, float(COURBES_CHAPITRES[idx]) + bonus * 0.018)
+	_duree_chute_actuelle = minf(6.3, float(CHUTE_CHAPITRES[idx]) + bonus * 0.16)
+
+	v31.set("_vitesse", vitesse)
+	v31.set("_courbes", courbes)
+	v31.set("_auto_cine", false)
+	v31.call("_set_cine", int(CINE_1_CHAPITRES[idx]))
+
+	var rmin: float = maxf(4.4, float(RUPTURE_MIN_CHAPITRES[idx]) - bonus * 0.18)
+	var rmax: float = maxf(rmin + 0.8, float(RUPTURE_MAX_CHAPITRES[idx]) - bonus * 0.18)
+	_prochaine_rupture = _rng.randf_range(rmin, rmax)
+
+	if app != null:
+		app.set_monde(int(MONDES_CHAPITRES[idx]))
+		app.message("CHAPITRE %d - %s" % [idx + 1, str(NOMS_CHAPITRES[idx])])
+
+
 func _maj_tunnel_mort(dt: float) -> void:
 	_cine_t += dt
-	if _cine_t > _rng.randf_range(3.8, 5.8):
-		_cine_t = 0.0
-		_choisir_cine_mort()
+	var idx: int = mini(_chapitre, NOMS_CHAPITRES.size() - 1)
+
+	# Une vraie evolution interne au chapitre : le tunnel change une fois
+	# avant la rupture, au lieu de tirer la meme boucle aleatoire en continu.
+	if _cine_t > _prochaine_rupture * 0.55:
+		_cine_t = -999.0
+		v31.call("_set_cine", int(CINE_2_CHAPITRES[idx]))
 
 	if _phase_t >= _prochaine_rupture:
 		_etat_mort = ETAT_RUPTURE
 		_phase_t = 0.0
 		_vibrer(0.55, 0.20)
-		app.message("RUPTURE DU TUNNEL")
+		app.message("RUPTURE - CHUTE LIBRE")
 
 
 func _maj_rupture() -> void:
 	var k: float = clampf(_phase_t / DUREE_RUPTURE, 0.0, 1.0)
 
-	# Le tube se contracte puis disparait brutalement.
-	var z: float = maxf(0.12, 1.0 - k * 0.88)
-	_tunnel_scale(Vector3(1.0 + k * 0.08, 1.0 + k * 0.08, z))
+	var z: float = maxf(0.10, 1.0 - k * 0.90)
+	_tunnel_scale(Vector3(1.0 + k * 0.10, 1.0 + k * 0.10, z))
 
-	if k > 0.58:
+	if k > 0.55:
 		_tunnel_visible(false)
 
 	if _phase_t >= DUREE_RUPTURE:
@@ -436,19 +450,19 @@ func _maj_rupture() -> void:
 		_tunnel_scale(Vector3.ONE)
 		app.monde.visible = true
 		_montrer_chute()
-		_vibrer(0.32, 0.16)
+		_vibrer(0.36, 0.18)
 
 
 func _maj_chute(dt: float) -> void:
 	_animer_chute(dt)
-	var k: float = clampf(_phase_t / DUREE_CHUTE, 0.0, 1.0)
+	var k: float = clampf(_phase_t / _duree_chute_actuelle, 0.0, 1.0)
 
-	if k > 0.52:
+	if k > 0.58:
 		_montrer_portail()
-		var pk: float = clampf((k - 0.52) / 0.48, 0.0, 1.0)
+		var pk: float = clampf((k - 0.58) / 0.42, 0.0, 1.0)
 		_animer_portail(pk)
 
-	if _phase_t >= DUREE_CHUTE:
+	if _phase_t >= _duree_chute_actuelle:
 		_etat_mort = ETAT_REENTREE
 		_phase_t = 0.0
 		_cacher_chute()
@@ -456,17 +470,17 @@ func _maj_chute(dt: float) -> void:
 		_tunnel_visible(true)
 		_tunnel_scale(Vector3.ONE)
 		v31.set("_vitesse", 34.0)
-		v31.set("_courbes", 1.58)
+		v31.set("_courbes", 1.62)
 		v31.call("_set_cine", 4)
-		_vibrer(0.78, 0.28)
-		app.message("REENTREE !")
+		_vibrer(0.82, 0.30)
+		app.message("ASPIRATION - REENTREE !")
 
 
 func _maj_reentree() -> void:
 	var k: float = clampf(_phase_t / DUREE_REENTREE, 0.0, 1.0)
-	_animer_portail(1.0 - k * 0.25)
+	_animer_portail(1.0 - k * 0.22)
 
-	var s: float = lerpf(1.22, 1.0, k)
+	var s: float = lerpf(1.30, 1.0, k)
 	_tunnel_scale(Vector3.ONE * s)
 
 	if _phase_t >= DUREE_REENTREE:
@@ -474,16 +488,14 @@ func _maj_reentree() -> void:
 		_etat_mort = ETAT_TUNNEL
 		_phase_t = 0.0
 		_cine_t = 0.0
-		_prochaine_rupture = _rng.randf_range(7.0, 12.5)
-		v31.set("_vitesse", _rng.randf_range(27.0, 33.0))
-		v31.set("_courbes", _rng.randf_range(1.28, 1.58))
-		_choisir_cine_mort()
 
+		var dernier: int = NOMS_CHAPITRES.size() - 1
+		if _chapitre < dernier:
+			_chapitre += 1
+		else:
+			_chaos += 1
+		_appliquer_chapitre()
 
-func _choisir_cine_mort() -> void:
-	var choix: Array = [1, 2, 3, 4, 5]
-	var i: int = int(choix[_rng.randi_range(0, choix.size() - 1)])
-	v31.call("_set_cine", i)
 
 
 func _tunnel_root() -> Node3D:
@@ -541,35 +553,91 @@ func _creer_chute() -> void:
 		_chute_vitesse.append(_rng.randf_range(7.0, 15.0))
 
 
+	# Anneaux horizontaux qui remontent autour du joueur : ce repere visuel
+	# donne enfin la sensation claire de descendre a grande vitesse.
+	var anneau_mesh: TorusMesh = TorusMesh.new()
+	anneau_mesh.inner_radius = 4.55
+	anneau_mesh.outer_radius = 4.66
+	anneau_mesh.rings = 36
+	anneau_mesh.ring_segments = 6
+
+	var anneau_mat: StandardMaterial3D = StandardMaterial3D.new()
+	anneau_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	anneau_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	anneau_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	anneau_mat.albedo_color = Color(0.22, 0.62, 1.0, 0.42)
+	anneau_mat.emission_enabled = true
+	anneau_mat.emission = Color(0.10, 0.45, 1.0)
+	anneau_mat.emission_energy_multiplier = 1.85
+	anneau_mesh.material = anneau_mat
+
+	_chute_anneaux_mm = MultiMesh.new()
+	_chute_anneaux_mm.transform_format = MultiMesh.TRANSFORM_3D
+	_chute_anneaux_mm.instance_count = NB_ANNEAUX_CHUTE
+	_chute_anneaux_mm.mesh = anneau_mesh
+
+	_chute_anneaux_node = MultiMeshInstance3D.new()
+	_chute_anneaux_node.name = "V34PuitsChute"
+	_chute_anneaux_node.multimesh = _chute_anneaux_mm
+	_chute_anneaux_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_chute_anneaux_node.extra_cull_margin = 120.0
+	_chute_anneaux_node.visible = false
+	app.origine.add_child(_chute_anneaux_node)
+
+	for i in NB_ANNEAUX_CHUTE:
+		_chute_anneaux_phase.append(float(i) / float(NB_ANNEAUX_CHUTE) * 36.0)
+
+
 func _montrer_chute() -> void:
 	if _chute_node != null:
 		_chute_node.position = app.camera.position
 		_chute_node.visible = true
+	if _chute_anneaux_node != null:
+		_chute_anneaux_node.position = app.camera.position
+		_chute_anneaux_node.visible = true
 
 
 func _cacher_chute() -> void:
 	if _chute_node != null:
 		_chute_node.visible = false
+	if _chute_anneaux_node != null:
+		_chute_anneaux_node.visible = false
 
 
 func _animer_chute(_dt: float) -> void:
 	if _chute_mm == null or _chute_node == null:
 		return
 
+	var idx: int = mini(_chapitre, NOMS_CHAPITRES.size() - 1)
+	var facteur: float = 1.0 + float(idx) * 0.16 + float(_chaos) * 0.045
 	_chute_node.position = app.camera.position
+	_chute_node.rotation.y = _phase_t * 0.12 * facteur
+
 	for i in NB_CHUTE:
 		var a: float = float(_chute_angle[i])
 		var r: float = float(_chute_rayon[i])
-		var vit: float = float(_chute_vitesse[i])
-		var y: float = fposmod(float(_chute_phase[i]) + _phase_t * vit + 8.0, 16.0) - 8.0
-		var torsion: float = _phase_t * 0.12
+		var vit: float = float(_chute_vitesse[i]) * facteur
+		var y: float = fposmod(float(_chute_phase[i]) + _phase_t * vit + 10.0, 20.0) - 10.0
+		var torsion: float = _phase_t * (0.15 + float(idx) * 0.025)
 		var pos: Vector3 = Vector3(
 			cos(a + torsion) * r,
 			y,
 			sin(a + torsion) * r - 1.5)
-		var stretch: float = 0.75 + vit / 9.0
+		var stretch: float = 1.0 + vit / 6.5
 		var b: Basis = Basis().scaled(Vector3(1.0, stretch, 1.0))
 		_chute_mm.set_instance_transform(i, Transform3D(b, pos))
+
+	if _chute_anneaux_mm != null and _chute_anneaux_node != null:
+		_chute_anneaux_node.position = app.camera.position
+		var vitesse_puits: float = 10.0 + float(idx) * 1.7 + float(_chaos) * 0.35
+		for i in NB_ANNEAUX_CHUTE:
+			var y2: float = fposmod(float(_chute_anneaux_phase[i]) + _phase_t * vitesse_puits + 18.0, 36.0) - 18.0
+			var n: float = clampf((y2 + 18.0) / 36.0, 0.0, 1.0)
+			var sc: float = lerpf(0.58, 1.32, n)
+			var wobble: float = sin(float(i) * 1.7 + _phase_t * 0.8) * 0.12 * float(idx)
+			var bp: Basis = Basis().scaled(Vector3(sc, 1.0, sc))
+			_chute_anneaux_mm.set_instance_transform(
+				i, Transform3D(bp, Vector3(wobble, y2, -1.8)))
 
 
 # -------------------------------------------------------------- portail
@@ -665,4 +733,6 @@ func _maj_etat() -> void:
 		ETAT_REENTREE:
 			nom = "Reentree"
 
-	_etat_label.text = "GRAND 8 DE LA MORT | %s | cycle %.1f s" % [nom, _phase_t]
+	var idx: int = mini(_chapitre, NOMS_CHAPITRES.size() - 1)
+	_etat_label.text = "GRAND 8 DE LA MORT | Chapitre %d : %s | %s" % [
+		idx + 1, str(NOMS_CHAPITRES[idx]), nom]

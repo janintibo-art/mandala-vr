@@ -1,13 +1,15 @@
 class_name V33Manager
 extends Node
-## Mandala VR v33 : premier Mode Course.
-## Piste geometrique procedurale infinie, petit vehicule visible, conduite au stick
-## gauche, assistance de trajectoire anticipative et turbo a la gachette gauche.
+## Mandala VR v33/v34 : Mode Course.
+## v34 : la piste est maintenant enfermee dans un tunnel geometrique 360 degres.
+## Conduite au stick gauche, assistance anticipative et turbo a la gachette gauche.
 
 const PREFS_V33: String = "user://v33_course.json"
 const NB_SEGMENTS: int = 72
 const NB_RAILS: int = NB_SEGMENTS * 2
+const NB_TUNNEL: int = 58
 const ESPACEMENT: float = 1.45
+const TUNNEL_ESPACEMENT: float = 1.72
 const DEMI_LARGEUR: float = 3.15
 const LIMITE_VEHICULE: float = 2.45
 
@@ -30,6 +32,9 @@ var _piste_node: MultiMeshInstance3D = null
 var _piste_mm: MultiMesh = null
 var _rails_node: MultiMeshInstance3D = null
 var _rails_mm: MultiMesh = null
+var _tunnel_node: MultiMeshInstance3D = null
+var _tunnel_mm: MultiMesh = null
+var _tunnel_mat: ShaderMaterial = null
 var _vehicule: Node3D = null
 var _hud: Label3D = null
 
@@ -125,9 +130,8 @@ func _installer() -> void:
 	_creer_vehicule()
 	_creer_hud()
 	_creer_page_course()
-	_brancher_accueil()
 	app.panneau.rafraichir()
-	app.message("v33 : Mode Course disponible depuis l'Accueil")
+	app.message("v34 : Course tunnel disponible depuis Experiences")
 
 
 func _creer_page_course() -> void:
@@ -141,7 +145,7 @@ func _creer_page_course() -> void:
 	p.add_child(titre)
 
 	app.panneau._note(p,
-		"Une piste geometrique infinie se construit devant toi. Stick gauche : direction. Gachette gauche : turbo. L'assistance anticipe les virages pour te garder sur une trajectoire rapide.")
+		"La course se deroule maintenant DANS un tunnel geometrique complet, proche du Grand 8 de la mort. Stick gauche : direction. Gachette gauche : turbo. La piste, les anneaux et les virages defilent autour du vehicule a grande vitesse.")
 
 	var g: GridContainer = GridContainer.new()
 	g.columns = 3
@@ -197,30 +201,6 @@ func _retour_accueil() -> void:
 		v32.call("_aller_accueil")
 
 
-
-func _brancher_accueil() -> void:
-	if v32 == null:
-		return
-	var page: Variant = v32.get("_page_accueil")
-	if not (page is VBoxContainer):
-		return
-	for n in (page as VBoxContainer).get_children():
-		if n is GridContainer:
-			for c in (n as GridContainer).get_children():
-				if c is Button and str((c as Button).text).begins_with("MODE COURSE"):
-					var b: Button = c
-					b.text = "MODE COURSE\nVehicule rapide avec assistance"
-					b.pressed.connect(_ouvrir_course_depuis_accueil)
-					return
-
-
-func _ouvrir_course_depuis_accueil() -> void:
-	var o: TabContainer = app.panneau.onglets
-	for i in o.get_child_count():
-		if str(o.get_child(i).name) == "Course":
-			o.current_tab = i
-			app.message("Mode Course")
-			return
 
 # -------------------------------------------------------------- presets
 
@@ -319,6 +299,34 @@ func _creer_piste() -> void:
 	_rails_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_rails_node.extra_cull_margin = 180.0
 	_racine.add_child(_rails_node)
+
+
+	# Tunnel 360 degres inspire du Grand 8 : le joueur n'a plus seulement
+	# deux lignes sur les cotes, il roule au coeur d'une structure lumineuse.
+	var tunnel_mesh: TorusMesh = TorusMesh.new()
+	tunnel_mesh.inner_radius = 3.55
+	tunnel_mesh.outer_radius = 3.66
+	tunnel_mesh.rings = 32
+	tunnel_mesh.ring_segments = 6
+
+	_tunnel_mat = ShaderMaterial.new()
+	_tunnel_mat.shader = load("res://shaders/grand8_v31.gdshader")
+	_tunnel_mat.set_shader_parameter("speed", _vitesse_base)
+	_tunnel_mat.set_shader_parameter("cine", 5)
+	_tunnel_mat.set_shader_parameter("world_index", app.monde.courant)
+	tunnel_mesh.material = _tunnel_mat
+
+	_tunnel_mm = MultiMesh.new()
+	_tunnel_mm.transform_format = MultiMesh.TRANSFORM_3D
+	_tunnel_mm.instance_count = NB_TUNNEL
+	_tunnel_mm.mesh = tunnel_mesh
+
+	_tunnel_node = MultiMeshInstance3D.new()
+	_tunnel_node.name = "TunnelCourse"
+	_tunnel_node.multimesh = _tunnel_mm
+	_tunnel_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_tunnel_node.extra_cull_margin = 180.0
+	_racine.add_child(_tunnel_node)
 
 
 func _creer_vehicule() -> void:
@@ -437,7 +445,7 @@ func _demarrer_differe() -> void:
 	app.sc.visible = false
 	app.sol.visible = false
 	if paysage != null:
-		paysage.visible = true
+		paysage.visible = false
 
 	_origine_xf = app.origine.global_transform
 	_racine.position = app.camera.position
@@ -456,7 +464,7 @@ func _demarrer_differe() -> void:
 		app.basculer_panneau()
 
 	_maj_piste()
-	app.message("MODE COURSE - stick gauche direction, gachette gauche turbo")
+	app.message("MODE COURSE TUNNEL - stick gauche direction, gachette gauche turbo")
 
 
 func arreter() -> void:
@@ -596,6 +604,29 @@ func _maj_piste() -> void:
 		_rails_mm.set_instance_transform(i * 2, Transform3D(b, gauche))
 		_rails_mm.set_instance_transform(i * 2 + 1, Transform3D(b, droite))
 
+	if _tunnel_mm != null:
+		var base_ring: Basis = Basis(Vector3.RIGHT, PI * 0.5)
+		for i in NB_TUNNEL:
+			var d2: float = 1.0 + float(i) * TUNNEL_ESPACEMENT
+			var s2: float = _distance + d2
+			var monde2: Vector3 = _courbe(s2) - base
+			var route_basis: Basis = _segment_basis(s2)
+			var roll: float = (
+				sin(s2 * 0.045) * 0.22
+				+ sin(s2 * 0.093 + 1.2) * 0.08
+			) * _virages
+			var ring_basis: Basis = route_basis * Basis(Vector3.FORWARD, roll) * base_ring
+			var centre2: Vector3 = Vector3(
+				monde2.x - _lane,
+				-0.08 + monde2.y,
+				-d2)
+			_tunnel_mm.set_instance_transform(i, Transform3D(ring_basis, centre2))
+
+	if _tunnel_mat != null:
+		_tunnel_mat.set_shader_parameter("speed", _vitesse_reelle)
+		_tunnel_mat.set_shader_parameter("cine", 5 if _profil < 2 else 3)
+		_tunnel_mat.set_shader_parameter("world_index", app.monde.courant)
+
 
 func _maj_vehicule(steer: float, turbo: float, dt: float) -> void:
 	if _vehicule == null:
@@ -633,7 +664,7 @@ func _maj_etat() -> void:
 			_assistance * 100.0]
 		return
 
-	_etat_label.text = "COURSE EN COURS | %d km/h | position %.0f%% | assistance %.0f%%" % [
+	_etat_label.text = "COURSE TUNNEL | %d km/h | position %.0f%% | assistance %.0f%%" % [
 		int(_vitesse_reelle * 3.6),
 		_lane / LIMITE_VEHICULE * 100.0,
 		_assistance * 100.0]
