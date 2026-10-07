@@ -109,46 +109,13 @@ func _mat_glow(c: Color, energie: float = 2.0) -> StandardMaterial3D:
 # ================================================================== NACELLE / REPERE PROCHE
 
 func _creer_nacelle() -> void:
+	# v37 : l'ancien "chariot" etait seulement une barre geometrique
+	# peu convaincante. On garde un noeud vide pour la compatibilite
+	# avec le moteur v35, mais aucun objet n'est affiche devant le joueur.
 	_nacelle = Node3D.new()
-	_nacelle.name = "V35Nacelle"
+	_nacelle.name = "V35NacelleCompat"
 	_nacelle.visible = false
 	app.camera.add_child(_nacelle)
-
-	var sombre: StandardMaterial3D = StandardMaterial3D.new()
-	sombre.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	sombre.albedo_color = Color(0.035, 0.045, 0.075)
-	sombre.metallic = 0.55
-	sombre.roughness = 0.34
-
-	var glow: StandardMaterial3D = _mat_glow(Color(0.20, 0.66, 1.0, 0.88), 2.5)
-
-	# Bord avant de la nacelle.
-	var avant: MeshInstance3D = MeshInstance3D.new()
-	var avant_mesh: BoxMesh = BoxMesh.new()
-	avant_mesh.size = Vector3(1.35, 0.11, 0.22)
-	avant.mesh = avant_mesh
-	avant.material_override = sombre
-	avant.position = Vector3(0.0, -0.58, -0.78)
-	_nacelle.add_child(avant)
-
-	# Barre de maintien visible en bas du champ de vision.
-	var barre: MeshInstance3D = MeshInstance3D.new()
-	var barre_mesh: BoxMesh = BoxMesh.new()
-	barre_mesh.size = Vector3(1.12, 0.055, 0.055)
-	barre.mesh = barre_mesh
-	barre.material_override = glow
-	barre.position = Vector3(0.0, -0.43, -0.70)
-	_nacelle.add_child(barre)
-
-	for cote in [-1.0, 1.0]:
-		var rail: MeshInstance3D = MeshInstance3D.new()
-		var rail_mesh: BoxMesh = BoxMesh.new()
-		rail_mesh.size = Vector3(0.055, 0.055, 1.10)
-		rail.mesh = rail_mesh
-		rail.material_override = glow
-		rail.position = Vector3(0.58 * cote, -0.53, -0.36)
-		rail.rotation.y = deg_to_rad(5.0 * cote)
-		_nacelle.add_child(rail)
 
 
 # ================================================================== GRAND 8 DE LA MORT V2
