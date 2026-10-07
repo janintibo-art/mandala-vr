@@ -1,6 +1,7 @@
 class_name V29Manager
 extends Node
-## Mandala VR v29 : paysages proceduraux en trois profondeurs.
+## Mandala VR v29/v30 : paysages proceduraux en trois profondeurs.
+## v30 : correctif parsing, "pass" etait utilise comme nom de variable.
 ## Trois spheres transparentes seulement : lointain, milieu, premier plan.
 ## Les couches restent dans le monde pour donner un vrai parallaxe stereo.
 
@@ -82,10 +83,10 @@ func _process(dt: float) -> void:
 		return
 
 	var monde_i: int = app.monde.courant
-	var pass: bool = v8 != null and bool(v8.get("_passthrough"))
-	if monde_i != _monde_avant or pass != _passthrough_avant:
+	var passthrough_actif: bool = v8 != null and bool(v8.get("_passthrough"))
+	if monde_i != _monde_avant or passthrough_actif != _passthrough_avant:
 		_monde_avant = monde_i
-		_passthrough_avant = pass
+		_passthrough_avant = passthrough_actif
 		_appliquer_monde()
 
 	_recentrer_si_besoin(dt)
@@ -203,14 +204,14 @@ func _appliquer_monde() -> void:
 		return
 
 	var monde_i: int = clampi(app.monde.courant, 0, Monde.NOMS.size() - 1)
-	var pass: bool = v8 != null and bool(v8.get("_passthrough"))
-	_racine.visible = _actif and not pass
+	var passthrough_actif: bool = v8 != null and bool(v8.get("_passthrough"))
+	_racine.visible = _actif and not passthrough_actif
 
 	for i in _couches.size():
 		var mi: MeshInstance3D = _couches[i]
 		var mat: ShaderMaterial = _mats[i]
 
-		mi.visible = _actif and not pass and (_premier_plan or i < 2)
+		mi.visible = _actif and not passthrough_actif and (_premier_plan or i < 2)
 
 		# Profondeur : le premier plan reagit davantage que le fond.
 		var s: float = 1.0
