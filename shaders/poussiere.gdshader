@@ -40,6 +40,30 @@ void vertex() {
 	} else if (v13_monde == 11) {
 		drift = vec3(0.01, 0.045, 0.015);
 		taille_monde = 1.15;
+	} else if (v13_monde == 12) {
+		drift = vec3(0.015, 0.075, 0.0);
+		taille_monde = 1.20;
+	} else if (v13_monde == 13) {
+		drift = vec3(0.07, 0.012, 0.01);
+		taille_monde = 0.90;
+	} else if (v13_monde == 14) {
+		drift = vec3(0.22, 0.015, 0.0);
+		taille_monde = 0.78;
+	} else if (v13_monde == 15) {
+		drift = vec3(0.01, 0.025, 0.0);
+		taille_monde = 1.35;
+	} else if (v13_monde == 16) {
+		drift = vec3(0.018, -0.075, 0.02);
+		taille_monde = 1.00;
+	} else if (v13_monde == 17) {
+		drift = vec3(0.10, -0.18, 0.025);
+		taille_monde = 1.38;
+	} else if (v13_monde == 18) {
+		drift = vec3(0.02, 0.34, 0.0);
+		taille_monde = 0.82;
+	} else if (v13_monde == 19) {
+		drift = vec3(0.0, 0.035, 0.075);
+		taille_monde = 1.12;
 	}
 
 	vec3 p = s * boite + drift * TIME * UV2.y * v13_vitesse;
@@ -57,10 +81,15 @@ void vertex() {
 	vec3 vc = (VIEW_MATRIX * vec4(p, 1.0)).xyz;
 	float finesse = mix(0.92, 1.08, clamp(v12_qualite, 0.6, 1.3) / 1.3);
 	vec2 taille_xy = UV * UV2.x * taille * finesse * taille_monde * (0.58 + dist * 0.12);
-	if (v13_monde == 9) {
+
+	if (v13_monde == 9 || v13_monde == 18) {
 		taille_xy.y *= 1.65;
 		taille_xy.x *= 0.72;
+	} else if (v13_monde == 17) {
+		taille_xy.x *= 1.55;
+		taille_xy.y *= 0.72;
 	}
+
 	vc.xy += taille_xy;
 	VERTEX = vc;
 }
@@ -79,7 +108,6 @@ void fragment() {
 		col *= vec3(0.45, 1.05, 1.28);
 		intens *= 0.78 + 0.32 * sin(TIME * 0.8 * v13_vitesse + graine * 28.0);
 	} else if (v13_monde == 6) {
-		// Pixel carre pour le monde Code.
 		float carre = 1.0 - smoothstep(0.64, 1.0, max(abs(UV.x), abs(UV.y)));
 		a = carre * carre;
 		col *= vec3(0.32, 1.35, 0.48);
@@ -98,6 +126,38 @@ void fragment() {
 	} else if (v13_monde == 11) {
 		col = mix(col, vec3(1.0, 0.48, 0.88), 0.55);
 		intens *= 0.75 + 0.25 * sin(TIME * 0.7 * v13_vitesse + graine * 30.0);
+
+	// v28
+	} else if (v13_monde == 12) {
+		col = mix(col, vec3(0.68, 1.0, 0.12), 0.58);
+		intens *= 0.30 + 1.05 * pow(0.5 + 0.5 * sin(TIME * (1.1 + graine) * v13_vitesse + graine * 55.0), 4.0);
+	} else if (v13_monde == 13) {
+		col = mix(col, vec3(0.22, 0.82, 1.0), 0.56);
+		intens *= 0.72 + 0.28 * sin(TIME * 0.45 * v13_vitesse + graine * 20.0);
+	} else if (v13_monde == 14) {
+		col = mix(col, vec3(1.0, 0.48, 0.24), 0.44);
+		intens *= 0.78;
+	} else if (v13_monde == 15) {
+		col = mix(col, vec3(0.80, 0.86, 0.94), 0.72);
+		a *= 0.72;
+		intens *= 0.58;
+	} else if (v13_monde == 16) {
+		col = mix(col, vec3(0.48, 0.78, 1.0), 0.62);
+		float croix16 = max(
+			1.0 - smoothstep(0.055, 0.20, abs(UV.x)),
+			1.0 - smoothstep(0.055, 0.20, abs(UV.y)));
+		a = max(a * 0.62, croix16 * (1.0 - smoothstep(0.18, 1.0, r)) * 0.72);
+	} else if (v13_monde == 17) {
+		col = mix(col, vec3(1.0, 0.34, 0.62), 0.72);
+		float petale = (1.0 - smoothstep(0.20, 0.95, abs(UV.x))) * (1.0 - smoothstep(0.12, 0.82, abs(UV.y)));
+		a *= 0.55 + petale * 0.55;
+		intens *= 0.72 + 0.28 * sin(TIME * 0.55 * v13_vitesse + graine * 28.0);
+	} else if (v13_monde == 18) {
+		col = mix(col, vec3(1.0, 0.12, 0.015), 0.76);
+		intens *= 1.08;
+	} else if (v13_monde == 19) {
+		col = mix(col, vec3(0.28, 0.18, 1.0), 0.70);
+		intens *= 0.65 + 0.38 * sin(TIME * 0.9 * v13_vitesse + graine * 35.0);
 	}
 
 	float variation = mix(0.72, 1.18, lumiere);
