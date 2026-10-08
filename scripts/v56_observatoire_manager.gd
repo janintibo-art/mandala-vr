@@ -1,10 +1,17 @@
 class_name V56ObservatoireManager
 extends Node
-## Mandala VR v56/v57/v58 : Observatoire.
+## Mandala VR v56/v57/v58/v59 : Observatoire.
 ##
 ## Deux experiences accessibles depuis l'Accueil :
 ## - Grand Musee : galerie monumentale de grandes toiles mandala.
 ## - Galaxie Mandala : plusieurs centaines de planetes a explorer librement.
+##
+## v59 :
+## - chemins lumineux dans les 6 mondes ;
+## - 3 balises mandala interactives par monde ;
+## - portail vers le monde suivant une fois les balises activees ;
+## - objets flottants animes uniquement dans le monde courant ;
+## - interactions par visee + gachette droite.
 ##
 ## v58 :
 ## - 6 mondes visitables au lieu de 3 ;
@@ -67,6 +74,12 @@ var _planet_world_root: Node3D = null
 var _planet_worlds: Array = []
 var _planet_index: int = -1
 var _planet_return_origin: Transform3D = Transform3D()
+
+var _world_beacons: Array = []
+var _world_beacon_state: Array = []
+var _world_portals: Array = []
+var _world_floaters: Array = []
+var _world_interact_trigger_was: bool = false
 
 var _status_label: Label = null
 
@@ -162,6 +175,15 @@ func _process(dt: float) -> void:
 				core.rotation.y += dt * 0.12
 				core.rotation.z += dt * 0.07
 
+			_update_world_floaters(_planet_index, dt)
+			_update_world_portal(_planet_index, dt)
+
+		var interact_now: bool = app.main_d.get_float("trigger") > 0.58
+		var interact_edge: bool = interact_now and not _world_interact_trigger_was
+		_world_interact_trigger_was = interact_now
+		if interact_edge and not app.panneau.visible:
+			_try_world_interaction()
+
 
 # =====================================================================
 # Installation et interface
@@ -256,7 +278,7 @@ func _update_status() -> void:
 		txt = "Galaxie Mandala active - vise un grand anneau et tire pour visiter"
 	elif _mode == MODE_PLANETE:
 		if _planet_index >= 0 and _planet_index < WORLD_NAMES.size():
-			txt = "Monde visite : " + str(WORLD_NAMES[_planet_index])
+			txt = "Monde : " + str(WORLD_NAMES[_planet_index]) + " - active 3 balises puis vise le portail"
 		else:
 			txt = "Monde Mandala"
 
@@ -834,6 +856,8 @@ func _build_one_world(index: int, nom: String, c1: Color, c2: Color) -> void:
 
 	_add_world_sky(world, index, c1, c2)
 	_add_world_horizon(world, index, c1, c2)
+	_add_world_path(world, index, c1, c2)
+	_add_world_interactives(world, index, c1, c2)
 
 	if index == 0:
 		_build_prismatic_garden(world, c1, c2)
@@ -924,6 +948,295 @@ func _add_world_horizon(
 		b = b.scaled(Vector3(1.0, h, 1.0))
 		mm.set_instance_transform(i, Transform3D(b, pos))
 		mm.set_instance_color(i, c1.darkened(0.25) if i % 2 == 0 else c2.darkened(0.30))
+
+
+func _add_world_path(
+	world: Node3D,
+	index: int,
+	c1: Color,
+	c2: Color
+) -> void:
+	var path_mesh: BoxMesh = BoxMesh.new()
+	path_mesh.size = Vector3(0.85, 0.06, 1.10)
+	path_mesh.material = _instance_color_mat()
+
+	var mm: MultiMesh = MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.instance_count = 18
+	mm.mesh = path_mesh
+
+	var node: MultiMeshInstance3D = MultiMeshInstance3D.new()
+	node.name = "CheminLumineux"
+	node.multimesh = mm
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	world.add_child(node)
+
+	for i in 18:
+		var z: float = 2.0 - float(i) * 1.25
+		var x: float = sin(float(i) * 0.42 + float(index)) * 1.05
+		var pos: Vector3 = Vector3(x, 0.05, z)
+		var b: Basis = Basis(Vector3.UP, sin(float(i) * 0.24) * 0.12)
+		mm.set_instance_transform(i, Transform3D(b, pos))
+		var c: Color = c1.lightened(0.12) if i % 2 == 0 else c2.lightened(0.10)
+		mm.set_instance_color(i, c)
+
+
+func _add_world_interactives(
+	world: Node3D,
+	index: int,
+	c1: Color,
+	c2: Color
+) -> void:
+	var beacon_list: Array = []
+	var beacon_state: Array = []
+
+	var positions: Array = [
+		Vector3(-5.8, 1.35, -4.0),
+		Vector3(5.8, 1.35, -5.8),
+		Vector3(0.0, 1.35, -12.8),
+	]
+
+	for i in 3:
+		var beacon: Node3D = Node3D.new()
+		beacon.name = "BaliseMandala%d" % (i + 1)
+		beacon.position = positions[i]
+		world.add_child(beacon)
+
+		var sphere: MeshInstance3D = MeshInstance3D.new()
+		sphere.name = "Coeur"
+		var sm: SphereMesh = SphereMesh.new()
+		sm.radius = 0.34
+		sm.height = 0.68
+		sm.radial_segments = 12
+		sm.rings = 6
+		sphere.mesh = sm
+		sphere.material_override = _mat(c1.darkened(0.18), 1.0, true)
+		sphere.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		beacon.add_child(sphere)
+
+		for k in 2:
+			var ring: MeshInstance3D = MeshInstance3D.new()
+			ring.name = "Anneau%d" % k
+			var tm: TorusMesh = TorusMesh.new()
+			tm.inner_radius = 0.58 + float(k) * 0.25
+			tm.outer_radius = 0.65 + float(k) * 0.25
+			tm.rings = 24
+			tm.ring_segments = 6
+			ring.mesh = tm
+			ring.material_override = _mat(
+				c1.darkened(0.16) if k == 0 else c2.darkened(0.16),
+				1.15,
+				true)
+			ring.rotation.x = PI * (0.28 + float(k) * 0.22)
+			ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			beacon.add_child(ring)
+
+		beacon_list.append(beacon)
+		beacon_state.append(false)
+
+	_world_beacons.append(beacon_list)
+	_world_beacon_state.append(beacon_state)
+
+	# Portail, ferme visuellement tant que les 3 balises ne sont pas actives.
+	var portal: Node3D = Node3D.new()
+	portal.name = "PortailMondeSuivant"
+	portal.position = Vector3(0.0, 2.5, -16.0)
+	world.add_child(portal)
+
+	var outer: MeshInstance3D = MeshInstance3D.new()
+	outer.name = "AnneauExterieur"
+	var otm: TorusMesh = TorusMesh.new()
+	otm.inner_radius = 2.0
+	otm.outer_radius = 2.15
+	otm.rings = 36
+	otm.ring_segments = 8
+	outer.mesh = otm
+	outer.material_override = _mat(c1.darkened(0.32), 0.8, true)
+	outer.rotation.x = PI * 0.5
+	outer.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	portal.add_child(outer)
+
+	var inner: MeshInstance3D = MeshInstance3D.new()
+	inner.name = "AnneauInterieur"
+	var itm: TorusMesh = TorusMesh.new()
+	itm.inner_radius = 1.42
+	itm.outer_radius = 1.53
+	itm.rings = 32
+	itm.ring_segments = 7
+	inner.mesh = itm
+	inner.material_override = _mat(c2.darkened(0.34), 0.75, true)
+	inner.rotation.x = PI * 0.5
+	inner.rotation.z = PI * 0.23
+	inner.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	portal.add_child(inner)
+
+	_world_portals.append(portal)
+
+	# Quelques objets flottants très légers, animes seulement dans le monde actif.
+	var floaters: Array = []
+	for i in 8:
+		var floater: Node3D = Node3D.new()
+		floater.name = "Flottant%d" % i
+		var a: float = TAU * float(i) / 8.0
+		var r: float = 7.0 + float(i % 3) * 1.8
+		floater.position = Vector3(cos(a) * r, 3.8 + float(i % 4) * 0.65, sin(a) * r - 5.0)
+		world.add_child(floater)
+
+		var ring: MeshInstance3D = MeshInstance3D.new()
+		var ftm: TorusMesh = TorusMesh.new()
+		ftm.inner_radius = 0.34
+		ftm.outer_radius = 0.41
+		ftm.rings = 18
+		ftm.ring_segments = 6
+		ring.mesh = ftm
+		ring.material_override = _mat(c1 if i % 2 == 0 else c2, 1.8, true)
+		ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		floater.add_child(ring)
+
+		floaters.append(floater)
+
+	_world_floaters.append(floaters)
+
+
+func _beacons_complete(index: int) -> bool:
+	if index < 0 or index >= _world_beacon_state.size():
+		return false
+	var states: Array = _world_beacon_state[index]
+	if states.size() < 3:
+		return false
+	for state_v in states:
+		if state_v != true:
+			return false
+	return true
+
+
+func _update_world_floaters(index: int, dt: float) -> void:
+	if index < 0 or index >= _world_floaters.size():
+		return
+
+	var floaters: Array = _world_floaters[index]
+	for i in floaters.size():
+		var f: Node3D = floaters[i]
+		f.rotation.y += dt * (0.18 + float(i % 4) * 0.04)
+		f.rotation.z += dt * (0.10 + float(i % 3) * 0.03)
+		var p: Vector3 = f.position
+		p.y += sin(Time.get_ticks_msec() * 0.0012 + float(i) * 0.8) * dt * 0.12
+		f.position = p
+
+
+func _update_world_portal(index: int, dt: float) -> void:
+	if index < 0 or index >= _world_portals.size():
+		return
+
+	var portal: Node3D = _world_portals[index]
+	var open: bool = _beacons_complete(index)
+	portal.rotation.y += dt * (0.18 if open else 0.04)
+
+	var outer: MeshInstance3D = portal.get_node_or_null("AnneauExterieur") as MeshInstance3D
+	var inner: MeshInstance3D = portal.get_node_or_null("AnneauInterieur") as MeshInstance3D
+	if outer != null:
+		outer.rotation.z += dt * (0.42 if open else 0.08)
+		var pulse: float = 1.0 + (0.08 * sin(Time.get_ticks_msec() * 0.004) if open else 0.0)
+		outer.scale = Vector3.ONE * pulse
+	if inner != null:
+		inner.rotation.z -= dt * (0.56 if open else 0.06)
+
+
+func _try_world_interaction() -> void:
+	if _planet_index < 0 or _planet_index >= _planet_worlds.size():
+		return
+
+	var ray_o: Vector3 = app.main_d.global_position
+	var ray_d: Vector3 = -app.main_d.global_transform.basis.z
+	ray_d = ray_d.normalized()
+
+	# 1) Balises.
+	if _planet_index < _world_beacons.size():
+		var beacons: Array = _world_beacons[_planet_index]
+		for i in beacons.size():
+			var beacon: Node3D = beacons[i]
+			if _ray_near_point(ray_o, ray_d, beacon.global_position, 0.95, 30.0):
+				_activate_beacon(_planet_index, i)
+				app.main_d.trigger_haptic_pulse("haptic", 0.0, 0.42, 0.06, 0.0)
+				return
+
+	# 2) Portail.
+	if _planet_index < _world_portals.size():
+		var portal: Node3D = _world_portals[_planet_index]
+		if _ray_near_point(ray_o, ray_d, portal.global_position, 2.4, 34.0):
+			if _beacons_complete(_planet_index):
+				_switch_to_next_world()
+				app.main_d.trigger_haptic_pulse("haptic", 0.0, 0.58, 0.08, 0.0)
+			else:
+				app.main_d.trigger_haptic_pulse("haptic", 0.0, 0.18, 0.04, 0.0)
+
+
+func _ray_near_point(
+	ray_o: Vector3,
+	ray_d: Vector3,
+	point: Vector3,
+	radius: float,
+	max_t: float
+) -> bool:
+	var v: Vector3 = point - ray_o
+	var t: float = v.dot(ray_d)
+	if t <= 0.0 or t > max_t:
+		return false
+	var closest: Vector3 = ray_o + ray_d * t
+	return closest.distance_to(point) <= radius
+
+
+func _activate_beacon(world_index: int, beacon_index: int) -> void:
+	if world_index < 0 or world_index >= _world_beacon_state.size():
+		return
+
+	var states: Array = _world_beacon_state[world_index]
+	if beacon_index < 0 or beacon_index >= states.size():
+		return
+	if states[beacon_index] == true:
+		return
+
+	states[beacon_index] = true
+	_world_beacon_state[world_index] = states
+
+	var beacons: Array = _world_beacons[world_index]
+	var beacon: Node3D = beacons[beacon_index]
+
+	var heart: MeshInstance3D = beacon.get_node_or_null("Coeur") as MeshInstance3D
+	if heart != null:
+		heart.material_override = _mat(Color(1.0, 0.92, 0.42, 1.0), 3.0, true)
+
+	for k in 2:
+		var ring: MeshInstance3D = beacon.get_node_or_null("Anneau%d" % k) as MeshInstance3D
+		if ring != null:
+			ring.material_override = _mat(
+				Color(1.0, 0.76 + float(k) * 0.10, 0.28, 1.0),
+				2.8,
+				true)
+
+	beacon.scale = Vector3.ONE * 1.14
+
+
+func _switch_to_next_world() -> void:
+	if _planet_index < 0:
+		return
+	var next_index: int = (_planet_index + 1) % VISITABLE_WORLDS
+	_set_planet_world(next_index)
+
+
+func _set_planet_world(index: int) -> void:
+	if index < 0 or index >= VISITABLE_WORLDS:
+		return
+
+	for i in _planet_worlds.size():
+		var world: Node3D = _planet_worlds[i]
+		world.visible = i == index
+
+	_planet_index = index
+	app.origine.global_transform = Transform3D(Basis(), Vector3.ZERO)
+	_world_interact_trigger_was = app.main_d.get_float("trigger") > 0.58
+	_update_status()
 
 
 func _build_prismatic_garden(world: Node3D, c1: Color, c2: Color) -> void:
@@ -1195,18 +1508,11 @@ func _enter_planet(index: int) -> void:
 		return
 
 	_planet_return_origin = app.origine.global_transform
-	_planet_index = index
 	_mode = MODE_PLANETE
 
 	_galaxy_root.visible = false
 	_planet_world_root.visible = true
-
-	for i in _planet_worlds.size():
-		var world: Node3D = _planet_worlds[i]
-		world.visible = i == index
-
-	app.origine.global_transform = Transform3D(Basis(), Vector3.ZERO)
-	_update_status()
+	_set_planet_world(index)
 
 
 func retourner_galaxie() -> void:
@@ -1222,6 +1528,7 @@ func retourner_galaxie() -> void:
 	app.origine.global_transform = _planet_return_origin
 	_planet_index = -1
 	_mode = MODE_GALAXIE
+	_galaxy_trigger_was = app.main_d.get_float("trigger") > 0.58
 	_update_status()
 
 
