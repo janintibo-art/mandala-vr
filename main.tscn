@@ -1,4 +1,4 @@
-[gd_scene load_steps=32 format=3]
+[gd_scene load_steps=33 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/v8_manager.gd" id="2"]
@@ -32,6 +32,7 @@
 [ext_resource type="Script" path="res://scripts/v44_manager.gd" id="30"]
 [ext_resource type="Script" path="res://scripts/v45_manager.gd" id="31"]
 [ext_resource type="Script" path="res://scripts/v46_manager.gd" id="32"]
+[ext_resource type="Script" path="res://scripts/v47_manager.gd" id="33"]
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1")
@@ -128,3 +129,6 @@ script = ExtResource("31")
 
 [node name="V46Manager" type="Node" parent="."]
 script = ExtResource("32")
+
+[node name="V47Manager" type="Node" parent="."]
+script = ExtResource("33")
