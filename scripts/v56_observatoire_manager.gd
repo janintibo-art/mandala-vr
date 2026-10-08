@@ -1,10 +1,16 @@
 class_name V56ObservatoireManager
 extends Node
-## Mandala VR v56 : Observatoire.
+## Mandala VR v56/v57 : Observatoire.
 ##
 ## Deux experiences accessibles depuis l'Accueil :
 ## - Grand Musee : galerie monumentale de grandes toiles mandala.
 ## - Galaxie Mandala : plusieurs centaines de planetes a explorer librement.
+##
+## v57 :
+## - les toiles du Musee reprennent noms et palettes des creations sauvegardees ;
+## - les 3 premiers mondes majeurs deviennent visitables ;
+## - entree en visant le monde puis gachette droite ;
+## - retour a la position exacte dans la galaxie.
 ##
 ## Les scenes sont majoritairement statiques et instanciees avec MultiMesh
 ## afin de rester raisonnables sur Quest 3. Le manager dort hors Observatoire.
@@ -12,12 +18,14 @@ extends Node
 const MODE_AUCUN: int = 0
 const MODE_MUSEE: int = 1
 const MODE_GALAXIE: int = 2
+const MODE_PLANETE: int = 3
 
 const MUSEUM_PAINTINGS: int = 24
 const GALAXY_PLANETS: int = 288
 const GALAXY_RINGS: int = 96
 const GALAXY_STARS: int = 720
 const HERO_PLANETS: int = 12
+const VISITABLE_WORLDS: int = 3
 
 var app = null
 var v8 = null
@@ -35,8 +43,16 @@ var _snapshot: Dictionary = {}
 
 var _museum_root: Node3D = null
 var _museum_spinners: Array = []
+var _museum_paintings: Array = []
+
 var _galaxy_root: Node3D = null
 var _hero_roots: Array = []
+var _galaxy_trigger_was: bool = false
+
+var _planet_world_root: Node3D = null
+var _planet_worlds: Array = []
+var _planet_index: int = -1
+var _planet_return_origin: Transform3D = Transform3D()
 
 var _status_label: Label = null
 
@@ -96,12 +112,16 @@ func _process(dt: float) -> void:
 	var cursor_v: Variant = app.get("_curseur")
 	if app.panneau.visible:
 		if ray_v is Node3D:
-			(ray_v as Node3D).visible = bool(_snapshot.get("ray_visible", true))
+			(ray_v as Node3D).visible = (_snapshot.get("ray_visible", true) == true)
 	else:
 		if ray_v is Node3D:
 			(ray_v as Node3D).visible = false
 		if cursor_v is Node3D:
 			(cursor_v as Node3D).visible = false
+
+	var trigger_now: bool = app.main_d.get_float("trigger") > 0.58
+	var trigger_edge: bool = trigger_now and not _galaxy_trigger_was
+	_galaxy_trigger_was = trigger_now
 
 	if _mode == MODE_MUSEE:
 		_maintenir_musee()
@@ -116,6 +136,18 @@ func _process(dt: float) -> void:
 			h.rotation.y += dt * (0.07 + float(i % 5) * 0.012)
 			h.rotation.z += dt * (0.04 + float(i % 4) * 0.010)
 
+		if trigger_edge and not app.panneau.visible:
+			_try_visit_planet()
+
+	elif _mode == MODE_PLANETE:
+		_maintenir_planete()
+		if _planet_index >= 0 and _planet_index < _planet_worlds.size():
+			var world: Node3D = _planet_worlds[_planet_index]
+			var core: Node3D = world.get_node_or_null("MandalaCore") as Node3D
+			if core != null:
+				core.rotation.y += dt * 0.12
+				core.rotation.z += dt * 0.07
+
 
 # =====================================================================
 # Installation et interface
@@ -124,6 +156,7 @@ func _installer() -> void:
 	_installe = true
 	_build_museum()
 	_build_galaxy()
+	_build_planet_worlds()
 	_build_ui()
 	_add_home_card()
 
@@ -134,7 +167,7 @@ func _build_ui() -> void:
 	app.panneau._titre(p, "Observatoire")
 	app.panneau._note(
 		p,
-		"Deux lieux a explorer librement. Le Musee est une grande galerie de toiles mandala. La Galaxie contient des centaines de planetes-spheres mandala reparties dans l'espace.")
+		"Deux lieux a explorer librement. Le Musee expose aussi tes creations sauvegardees. Dans la Galaxie, les trois premiers mondes majeurs sont visitables : vise leur grand anneau lumineux et appuie sur la gachette droite.")
 
 	var grid: GridContainer = GridContainer.new()
 	grid.columns = 2
@@ -158,6 +191,7 @@ func _build_ui() -> void:
 		Callable(self, "demarrer_galaxie"))
 
 	var actions: HBoxContainer = app.panneau._rangee(p)
+	app.panneau._bouton(actions, "Retour Galaxie", retourner_galaxie)
 	app.panneau._bouton(actions, "Quitter l'Observatoire", arreter)
 	if v32.has_method("_aller_accueil"):
 		app.panneau._bouton(actions, "Retour Accueil", Callable(self, "_retour_accueil"))
@@ -205,7 +239,13 @@ func _update_status() -> void:
 	if _mode == MODE_MUSEE:
 		txt = "Grand Musee actif"
 	elif _mode == MODE_GALAXIE:
-		txt = "Galaxie Mandala active"
+		txt = "Galaxie Mandala active - vise un grand anneau et tire pour visiter"
+	elif _mode == MODE_PLANETE:
+		var noms: Array = ["Jardin Prismatique", "Temple Orbital", "Mer Fractale"]
+		if _planet_index >= 0 and _planet_index < noms.size():
+			txt = "Monde visite : " + str(noms[_planet_index])
+		else:
+			txt = "Monde Mandala"
 
 	_status_label.text = txt
 
@@ -390,6 +430,7 @@ func _add_painting(side: float, index: int, z: float) -> void:
 	root.add_child(canvas)
 
 	# Mandala mural : trois anneaux imbriques.
+	var painting_rings: Array = []
 	for k in 3:
 		var ring: MeshInstance3D = MeshInstance3D.new()
 		var tm: TorusMesh = TorusMesh.new()
@@ -405,6 +446,7 @@ func _add_painting(side: float, index: int, z: float) -> void:
 		ring.scale = Vector3.ONE * scale_v
 		ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(ring)
+		painting_rings.append(ring)
 
 	var core: MeshInstance3D = MeshInstance3D.new()
 	var sm: SphereMesh = SphereMesh.new()
@@ -417,6 +459,78 @@ func _add_painting(side: float, index: int, z: float) -> void:
 	core.position.x = -side * 0.33
 	core.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	root.add_child(core)
+
+	var plaque: Label3D = Label3D.new()
+	plaque.name = "Plaque"
+	plaque.text = "Collection Mandala"
+	plaque.font_size = 26
+	plaque.pixel_size = 0.0018
+	plaque.outline_size = 6
+	plaque.modulate = Color(0.90, 0.90, 0.96)
+	plaque.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	plaque.position = Vector3(-side * 0.42, -2.28, 0.0)
+	root.add_child(plaque)
+
+	_museum_paintings.append({
+		"rings": painting_rings,
+		"core": core,
+		"label": plaque,
+	})
+
+
+func _refresh_museum_saved_art() -> void:
+	var oeuvres: Array = Stockage.lister()
+
+	for i in _museum_paintings.size():
+		var p: Dictionary = _museum_paintings[i]
+		var rings: Array = p["rings"]
+		var core: MeshInstance3D = p["core"]
+		var plaque: Label3D = p["label"]
+
+		if i >= oeuvres.size():
+			plaque.text = "Collection Mandala %02d" % (i + 1)
+			continue
+
+		var meta: Dictionary = oeuvres[i]
+		var brut: String = Stockage.lire(str(meta.get("id", "")))
+		var oeuvre: Dictionary = Oeuvre.decoder(brut)
+		if oeuvre.is_empty():
+			plaque.text = str(meta.get("nom", "Sans titre")).left(40)
+			continue
+
+		plaque.text = str(oeuvre.get("nom", "Sans titre")).left(40)
+
+		var couleurs: Array = []
+		var traits_v: Variant = oeuvre.get("traits", [])
+		if traits_v is Array:
+			for trait_v in (traits_v as Array):
+				if not (trait_v is TraitDessin):
+					continue
+				var td: TraitDessin = trait_v
+				var pi: int = td.reglages.palette
+				if pi < 0 or pi >= Tables.palettes.size():
+					continue
+				var pal: Dictionary = Tables.palettes[pi]
+				var cols_v: Variant = pal.get("cols", PackedColorArray())
+				if cols_v is PackedColorArray:
+					var cols: PackedColorArray = cols_v
+					for c in cols:
+						couleurs.append(c)
+						if couleurs.size() >= 6:
+							break
+				if couleurs.size() >= 6:
+					break
+
+		if couleurs.is_empty():
+			continue
+
+		for k in rings.size():
+			var r: MeshInstance3D = rings[k]
+			var c: Color = couleurs[k % couleurs.size()]
+			r.material_override = _mat(c, 2.35, true)
+
+		var cc: Color = couleurs[(couleurs.size() - 1) % couleurs.size()]
+		core.material_override = _mat(cc.lightened(0.12), 2.7, true)
 
 
 func _maintenir_musee() -> void:
@@ -591,6 +705,21 @@ func _build_galaxy() -> void:
 		hero.position = _planet_positions[planet_i]
 		_galaxy_root.add_child(hero)
 
+		if i < VISITABLE_WORLDS:
+			var visit_ring: MeshInstance3D = MeshInstance3D.new()
+			visit_ring.name = "AnneauVisitable"
+			var vtm: TorusMesh = TorusMesh.new()
+			vtm.inner_radius = 1.55
+			vtm.outer_radius = 1.67
+			vtm.rings = 36
+			vtm.ring_segments = 8
+			visit_ring.mesh = vtm
+			visit_ring.material_override = _mat(Color(1.0, 0.86, 0.32, 0.88), 3.0, true)
+			visit_ring.rotation.x = PI * 0.5
+			visit_ring.scale = Vector3.ONE * maxf(1.0, float(_planet_sizes[planet_i]) * 1.55)
+			visit_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			hero.add_child(visit_ring)
+
 		for k in 2:
 			var ring: MeshInstance3D = MeshInstance3D.new()
 			var tm: TorusMesh = TorusMesh.new()
@@ -612,13 +741,251 @@ func _build_galaxy() -> void:
 
 
 # =====================================================================
+# Mondes visitables
+
+func _build_planet_worlds() -> void:
+	_planet_world_root = Node3D.new()
+	_planet_world_root.name = "ObservatoireMondesVisitables"
+	_planet_world_root.visible = false
+	app.add_child(_planet_world_root)
+
+	_build_one_world(
+		0,
+		"JardinPrismatique",
+		Color(0.20, 0.82, 1.0),
+		Color(0.74, 0.28, 1.0))
+	_build_one_world(
+		1,
+		"TempleOrbital",
+		Color(1.0, 0.62, 0.18),
+		Color(0.30, 0.42, 1.0))
+	_build_one_world(
+		2,
+		"MerFractale",
+		Color(0.16, 1.0, 0.66),
+		Color(1.0, 0.24, 0.56))
+
+
+func _build_one_world(index: int, nom: String, c1: Color, c2: Color) -> void:
+	var world: Node3D = Node3D.new()
+	world.name = nom
+	world.visible = false
+	_planet_world_root.add_child(world)
+	_planet_worlds.append(world)
+
+	var floor: MeshInstance3D = MeshInstance3D.new()
+	var floor_mesh: CylinderMesh = CylinderMesh.new()
+	floor_mesh.top_radius = 18.0
+	floor_mesh.bottom_radius = 18.0
+	floor_mesh.height = 0.28
+	floor_mesh.radial_segments = 40
+	floor.mesh = floor_mesh
+	floor.material_override = _mat(c1.darkened(0.72))
+	floor.position.y = -0.14
+	floor.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	world.add_child(floor)
+
+	var core: Node3D = Node3D.new()
+	core.name = "MandalaCore"
+	core.position = Vector3(0.0, 3.1, -6.5)
+	world.add_child(core)
+
+	for k in 3:
+		var ring: MeshInstance3D = MeshInstance3D.new()
+		var tm: TorusMesh = TorusMesh.new()
+		tm.inner_radius = 1.25 + float(k) * 0.62
+		tm.outer_radius = 1.34 + float(k) * 0.62
+		tm.rings = 36
+		tm.ring_segments = 8
+		ring.mesh = tm
+		ring.material_override = _mat(c1 if k % 2 == 0 else c2, 2.5, true)
+		ring.rotation.x = PI * (0.12 + float(k) * 0.18)
+		ring.rotation.z = float(k) * PI * 0.22
+		ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		core.add_child(ring)
+
+	if index == 0:
+		_build_prismatic_garden(world, c1, c2)
+	elif index == 1:
+		_build_orbital_temple(world, c1, c2)
+	else:
+		_build_fractal_sea(world, c1, c2)
+
+
+func _build_prismatic_garden(world: Node3D, c1: Color, c2: Color) -> void:
+	var mesh: BoxMesh = BoxMesh.new()
+	mesh.size = Vector3(0.22, 1.0, 0.22)
+	mesh.material = _instance_color_mat()
+
+	var mm: MultiMesh = MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.instance_count = 56
+	mm.mesh = mesh
+
+	var node: MultiMeshInstance3D = MultiMeshInstance3D.new()
+	node.name = "CrystalGarden"
+	node.multimesh = mm
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	world.add_child(node)
+
+	for i in 56:
+		var a: float = TAU * float(i) / 56.0 + float(i % 7) * 0.12
+		var radius: float = 5.0 + float(i % 5) * 2.0
+		var h: float = 1.2 + float(i % 8) * 0.42
+		var pos: Vector3 = Vector3(cos(a) * radius, h * 0.5, sin(a) * radius - 3.0)
+		var b: Basis = Basis(Vector3.UP, -a)
+		b = b.scaled(Vector3(1.0, h, 1.0))
+		mm.set_instance_transform(i, Transform3D(b, pos))
+		mm.set_instance_color(i, c1 if i % 2 == 0 else c2)
+
+
+func _build_orbital_temple(world: Node3D, c1: Color, c2: Color) -> void:
+	for i in 12:
+		var a: float = TAU * float(i) / 12.0
+		var pillar: MeshInstance3D = MeshInstance3D.new()
+		var bm: BoxMesh = BoxMesh.new()
+		bm.size = Vector3(0.55, 4.4, 0.55)
+		pillar.mesh = bm
+		pillar.material_override = _mat(c1.darkened(0.35), 0.45)
+		pillar.position = Vector3(cos(a) * 10.0, 2.2, sin(a) * 10.0 - 3.0)
+		pillar.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		world.add_child(pillar)
+
+		var halo: MeshInstance3D = MeshInstance3D.new()
+		var tm: TorusMesh = TorusMesh.new()
+		tm.inner_radius = 0.74
+		tm.outer_radius = 0.83
+		tm.rings = 24
+		tm.ring_segments = 7
+		halo.mesh = tm
+		halo.material_override = _mat(c2, 2.2, true)
+		halo.position = pillar.position + Vector3(0.0, 2.25, 0.0)
+		halo.rotation.x = PI * 0.5
+		halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		world.add_child(halo)
+
+
+func _build_fractal_sea(world: Node3D, c1: Color, c2: Color) -> void:
+	var island_mesh: BoxMesh = BoxMesh.new()
+	island_mesh.size = Vector3(1.0, 0.30, 1.0)
+	island_mesh.material = _instance_color_mat()
+
+	var mm: MultiMesh = MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.instance_count = 48
+	mm.mesh = island_mesh
+
+	var node: MultiMeshInstance3D = MultiMeshInstance3D.new()
+	node.name = "FractalIslands"
+	node.multimesh = mm
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	world.add_child(node)
+
+	for i in 48:
+		var a: float = float(i) * 2.399963
+		var radius: float = 2.0 + sqrt(float(i)) * 1.75
+		var pos: Vector3 = Vector3(
+			cos(a) * radius,
+			0.15 + sin(float(i) * 0.73) * 0.28,
+			sin(a) * radius - 3.0)
+		var sc: float = 0.8 + float(i % 5) * 0.34
+		var b: Basis = Basis(Vector3.UP, a).scaled(Vector3(sc, 1.0, sc))
+		mm.set_instance_transform(i, Transform3D(b, pos))
+		mm.set_instance_color(i, c1 if i % 3 != 0 else c2)
+
+
+func _try_visit_planet() -> void:
+	var ray_o: Vector3 = app.main_d.global_position
+	var ray_d: Vector3 = -app.main_d.global_transform.basis.z
+	ray_d = ray_d.normalized()
+
+	var best_index: int = -1
+	var best_t: float = 9999.0
+
+	for i in VISITABLE_WORLDS:
+		if i >= _hero_roots.size():
+			continue
+
+		var hero: Node3D = _hero_roots[i]
+		var centre: Vector3 = hero.global_position
+		var to_centre: Vector3 = centre - ray_o
+		var along: float = to_centre.dot(ray_d)
+		if along <= 0.0 or along >= best_t:
+			continue
+
+		var closest: Vector3 = ray_o + ray_d * along
+		var hit_radius: float = 2.2 + float(_planet_sizes[i * 24]) * 1.8
+		if closest.distance_to(centre) <= hit_radius:
+			best_index = i
+			best_t = along
+
+	if best_index >= 0:
+		_enter_planet(best_index)
+		app.main_d.trigger_haptic_pulse("haptic", 0.0, 0.48, 0.07, 0.0)
+
+
+func _enter_planet(index: int) -> void:
+	if _mode != MODE_GALAXIE:
+		return
+	if index < 0 or index >= VISITABLE_WORLDS:
+		return
+
+	_planet_return_origin = app.origine.global_transform
+	_planet_index = index
+	_mode = MODE_PLANETE
+
+	_galaxy_root.visible = false
+	_planet_world_root.visible = true
+
+	for i in _planet_worlds.size():
+		var world: Node3D = _planet_worlds[i]
+		world.visible = i == index
+
+	app.origine.global_transform = Transform3D(Basis(), Vector3.ZERO)
+	_update_status()
+
+
+func retourner_galaxie() -> void:
+	if not _active or _mode != MODE_PLANETE:
+		return
+
+	for world_v in _planet_worlds:
+		var world: Node3D = world_v
+		world.visible = false
+
+	_planet_world_root.visible = false
+	_galaxy_root.visible = true
+	app.origine.global_transform = _planet_return_origin
+	_planet_index = -1
+	_mode = MODE_GALAXIE
+	_update_status()
+
+
+func _maintenir_planete() -> void:
+	var p: Vector3 = app.origine.global_position
+	p.y = 0.0
+
+	var horizontal: Vector2 = Vector2(p.x, p.z)
+	if horizontal.length() > 16.5:
+		horizontal = horizontal.normalized() * 16.5
+		p.x = horizontal.x
+		p.z = horizontal.y
+
+	app.origine.global_position = p
+
+
+# =====================================================================
 # Activation / restauration
 
 func demarrer_musee() -> void:
+	_refresh_museum_saved_art()
 	_start_mode(MODE_MUSEE)
 
 
 func demarrer_galaxie() -> void:
+	_planet_index = -1
 	_start_mode(MODE_GALAXIE)
 
 
@@ -705,6 +1072,12 @@ func _start_mode(mode: int) -> void:
 
 	_museum_root.visible = mode == MODE_MUSEE
 	_galaxy_root.visible = mode == MODE_GALAXIE
+	_planet_world_root.visible = false
+	for world_v in _planet_worlds:
+		var world: Node3D = world_v
+		world.visible = false
+	_planet_index = -1
+	_galaxy_trigger_was = app.main_d.get_float("trigger") > 0.58
 
 	if app.panneau.visible:
 		app.basculer_panneau()
@@ -720,19 +1093,24 @@ func arreter() -> void:
 	_mode = MODE_AUCUN
 	_museum_root.visible = false
 	_galaxy_root.visible = false
+	_planet_world_root.visible = false
+	for world_v in _planet_worlds:
+		var world: Node3D = world_v
+		world.visible = false
+	_planet_index = -1
 
 	if not _snapshot.is_empty():
 		app.origine.global_transform = _snapshot.get("origin", app.origine.global_transform)
 		app.sc.global_transform = _snapshot.get("sc_transform", app.sc.global_transform)
-		app.sc.visible = bool(_snapshot.get("sc_visible", true))
-		app.sol.visible = bool(_snapshot.get("sol_visible", true))
+		app.sc.visible = (_snapshot.get("sc_visible", true) == true)
+		app.sol.visible = (_snapshot.get("sol_visible", true) == true)
 
 		var paysage_v: Variant = _snapshot.get("paysage", null)
 		if paysage_v is Node3D and is_instance_valid(paysage_v):
-			(paysage_v as Node3D).visible = bool(_snapshot.get("paysage_visible", true))
+			(paysage_v as Node3D).visible = (_snapshot.get("paysage_visible", true) == true)
 
 		if (
-			bool(_snapshot.get("passthrough", false))
+			(_snapshot.get("passthrough", false) == true)
 			and v8 != null
 			and v8.has_method("_set_passthrough")
 		):
@@ -744,13 +1122,13 @@ func arreter() -> void:
 		var ray_v: Variant = app.get("_rayon")
 
 		if hud_v is Node3D:
-			(hud_v as Node3D).visible = bool(_snapshot.get("hud_visible", true))
+			(hud_v as Node3D).visible = (_snapshot.get("hud_visible", true) == true)
 		if msg_v is Node3D:
-			(msg_v as Node3D).visible = bool(_snapshot.get("msg_visible", true))
+			(msg_v as Node3D).visible = (_snapshot.get("msg_visible", true) == true)
 		if help_v is Node3D:
-			(help_v as Node3D).visible = bool(_snapshot.get("help_visible", false))
+			(help_v as Node3D).visible = (_snapshot.get("help_visible", false) == true)
 		if ray_v is Node3D:
-			(ray_v as Node3D).visible = bool(_snapshot.get("ray_visible", true))
+			(ray_v as Node3D).visible = (_snapshot.get("ray_visible", true) == true)
 
 	_snapshot = {}
 	_update_status()
