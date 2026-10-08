@@ -1,10 +1,16 @@
 class_name V56ObservatoireManager
 extends Node
-## Mandala VR v56/v57 : Observatoire.
+## Mandala VR v56/v57/v58 : Observatoire.
 ##
 ## Deux experiences accessibles depuis l'Accueil :
 ## - Grand Musee : galerie monumentale de grandes toiles mandala.
 ## - Galaxie Mandala : plusieurs centaines de planetes a explorer librement.
+##
+## v58 :
+## - 6 mondes visitables au lieu de 3 ;
+## - ciel, horizon et relief propres a chaque monde ;
+## - architectures et silhouettes tres differentes ;
+## - toujours un seul manager Observatoire.
 ##
 ## v57 :
 ## - les toiles du Musee reprennent noms et palettes des creations sauvegardees ;
@@ -25,7 +31,15 @@ const GALAXY_PLANETS: int = 288
 const GALAXY_RINGS: int = 96
 const GALAXY_STARS: int = 720
 const HERO_PLANETS: int = 12
-const VISITABLE_WORLDS: int = 3
+const WORLD_NAMES: Array = [
+	"Jardin Prismatique",
+	"Temple Orbital",
+	"Mer Fractale",
+	"Foret de Cristal",
+	"Cite des Anneaux",
+	"Abysses Lumineux",
+]
+const VISITABLE_WORLDS: int = 6
 
 var app = null
 var v8 = null
@@ -167,7 +181,7 @@ func _build_ui() -> void:
 	app.panneau._titre(p, "Observatoire")
 	app.panneau._note(
 		p,
-		"Deux lieux a explorer librement. Le Musee expose aussi tes creations sauvegardees. Dans la Galaxie, les trois premiers mondes majeurs sont visitables : vise leur grand anneau lumineux et appuie sur la gachette droite.")
+		"Deux lieux a explorer librement. Le Musee expose aussi tes creations sauvegardees. Dans la Galaxie, les six premiers mondes majeurs sont visitables : vise leur grand anneau lumineux et appuie sur la gachette droite.")
 
 	var grid: GridContainer = GridContainer.new()
 	grid.columns = 2
@@ -241,9 +255,8 @@ func _update_status() -> void:
 	elif _mode == MODE_GALAXIE:
 		txt = "Galaxie Mandala active - vise un grand anneau et tire pour visiter"
 	elif _mode == MODE_PLANETE:
-		var noms: Array = ["Jardin Prismatique", "Temple Orbital", "Mer Fractale"]
-		if _planet_index >= 0 and _planet_index < noms.size():
-			txt = "Monde visite : " + str(noms[_planet_index])
+		if _planet_index >= 0 and _planet_index < WORLD_NAMES.size():
+			txt = "Monde visite : " + str(WORLD_NAMES[_planet_index])
 		else:
 			txt = "Monde Mandala"
 
@@ -764,6 +777,21 @@ func _build_planet_worlds() -> void:
 		"MerFractale",
 		Color(0.16, 1.0, 0.66),
 		Color(1.0, 0.24, 0.56))
+	_build_one_world(
+		3,
+		"ForetCristal",
+		Color(0.42, 0.90, 1.0),
+		Color(0.58, 0.22, 1.0))
+	_build_one_world(
+		4,
+		"CiteAnneaux",
+		Color(1.0, 0.42, 0.16),
+		Color(0.18, 0.58, 1.0))
+	_build_one_world(
+		5,
+		"AbyssesLumineux",
+		Color(0.08, 0.42, 1.0),
+		Color(0.94, 0.18, 0.82))
 
 
 func _build_one_world(index: int, nom: String, c1: Color, c2: Color) -> void:
@@ -804,12 +832,98 @@ func _build_one_world(index: int, nom: String, c1: Color, c2: Color) -> void:
 		ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		core.add_child(ring)
 
+	_add_world_sky(world, index, c1, c2)
+	_add_world_horizon(world, index, c1, c2)
+
 	if index == 0:
 		_build_prismatic_garden(world, c1, c2)
 	elif index == 1:
 		_build_orbital_temple(world, c1, c2)
-	else:
+	elif index == 2:
 		_build_fractal_sea(world, c1, c2)
+	elif index == 3:
+		_build_crystal_forest(world, c1, c2)
+	elif index == 4:
+		_build_ring_city(world, c1, c2)
+	else:
+		_build_luminous_abyss(world, c1, c2)
+
+
+func _add_world_sky(
+	world: Node3D,
+	index: int,
+	c1: Color,
+	c2: Color
+) -> void:
+	var sky: MeshInstance3D = MeshInstance3D.new()
+	sky.name = "CielMonde"
+	var sm: SphereMesh = SphereMesh.new()
+	sm.radius = 44.0
+	sm.height = 88.0
+	sm.radial_segments = 28
+	sm.rings = 14
+	sky.mesh = sm
+
+	var mix: float = 0.22 + float(index % 3) * 0.10
+	var sky_color: Color = c1.darkened(0.82).lerp(c2.darkened(0.76), mix)
+	var mat: StandardMaterial3D = _mat(sky_color)
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	sky.material_override = mat
+	sky.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	world.add_child(sky)
+
+	# Deux grands halos dans le ciel servent de repere de direction.
+	for k in 2:
+		var halo: MeshInstance3D = MeshInstance3D.new()
+		var tm: TorusMesh = TorusMesh.new()
+		tm.inner_radius = 14.0 + float(k) * 5.5
+		tm.outer_radius = 14.16 + float(k) * 5.5
+		tm.rings = 48
+		tm.ring_segments = 7
+		halo.mesh = tm
+		halo.material_override = _mat(
+			c1.lightened(0.12) if k == 0 else c2.lightened(0.12),
+			1.35,
+			true)
+		halo.position = Vector3(0.0, 8.0 + float(k) * 2.0, -15.0)
+		halo.rotation = Vector3(PI * (0.18 + float(k) * 0.12), 0.0, PI * float(k) * 0.18)
+		halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		world.add_child(halo)
+
+
+func _add_world_horizon(
+	world: Node3D,
+	index: int,
+	c1: Color,
+	c2: Color
+) -> void:
+	# Relief circulaire lointain autour de la zone jouable.
+	var ridge_mesh: BoxMesh = BoxMesh.new()
+	ridge_mesh.size = Vector3(1.8, 1.0, 0.75)
+	ridge_mesh.material = _instance_color_mat()
+
+	var mm: MultiMesh = MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.instance_count = 48
+	mm.mesh = ridge_mesh
+
+	var node: MultiMeshInstance3D = MultiMeshInstance3D.new()
+	node.name = "ReliefHorizon"
+	node.multimesh = mm
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	world.add_child(node)
+
+	for i in 48:
+		var a: float = TAU * float(i) / 48.0
+		var wave: float = 1.0 + 0.35 * sin(float(i) * (0.78 + float(index) * 0.06))
+		var radius: float = 23.0 + float(i % 4) * 0.7
+		var h: float = (2.8 + float(i % 7) * 0.58) * wave
+		var pos: Vector3 = Vector3(cos(a) * radius, h * 0.5 - 0.1, sin(a) * radius - 3.0)
+		var b: Basis = Basis(Vector3.UP, -a)
+		b = b.scaled(Vector3(1.0, h, 1.0))
+		mm.set_instance_transform(i, Transform3D(b, pos))
+		mm.set_instance_color(i, c1.darkened(0.25) if i % 2 == 0 else c2.darkened(0.30))
 
 
 func _build_prismatic_garden(world: Node3D, c1: Color, c2: Color) -> void:
@@ -894,6 +1008,154 @@ func _build_fractal_sea(world: Node3D, c1: Color, c2: Color) -> void:
 		var b: Basis = Basis(Vector3.UP, a).scaled(Vector3(sc, 1.0, sc))
 		mm.set_instance_transform(i, Transform3D(b, pos))
 		mm.set_instance_color(i, c1 if i % 3 != 0 else c2)
+
+
+func _build_crystal_forest(world: Node3D, c1: Color, c2: Color) -> void:
+	var trunk_mesh: BoxMesh = BoxMesh.new()
+	trunk_mesh.size = Vector3(0.28, 1.0, 0.28)
+	trunk_mesh.material = _instance_color_mat()
+
+	var mm: MultiMesh = MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.instance_count = 72
+	mm.mesh = trunk_mesh
+
+	var node: MultiMeshInstance3D = MultiMeshInstance3D.new()
+	node.name = "ForetCristal"
+	node.multimesh = mm
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	world.add_child(node)
+
+	for i in 72:
+		var a: float = float(i) * 2.399963
+		var radius: float = 3.4 + sqrt(float(i)) * 1.55
+		var h: float = 1.8 + float(i % 9) * 0.55
+		var pos: Vector3 = Vector3(
+			cos(a) * radius,
+			h * 0.5,
+			sin(a) * radius - 3.0)
+		var b: Basis = Basis(Vector3.UP, a * 0.2)
+		b = b.scaled(Vector3(
+			0.72 + float(i % 3) * 0.22,
+			h,
+			0.72 + float((i + 1) % 3) * 0.22))
+		mm.set_instance_transform(i, Transform3D(b, pos))
+		mm.set_instance_color(i, c1 if i % 3 != 0 else c2)
+
+	# Couronne suspendue au-dessus de la foret.
+	for k in 3:
+		var ring: MeshInstance3D = MeshInstance3D.new()
+		var tm: TorusMesh = TorusMesh.new()
+		tm.inner_radius = 5.0 + float(k) * 2.5
+		tm.outer_radius = 5.10 + float(k) * 2.5
+		tm.rings = 40
+		tm.ring_segments = 7
+		ring.mesh = tm
+		ring.material_override = _mat(c2 if k % 2 == 0 else c1, 1.9, true)
+		ring.position = Vector3(0.0, 6.0 + float(k) * 1.0, -4.0)
+		ring.rotation.x = PI * (0.22 + float(k) * 0.12)
+		ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		world.add_child(ring)
+
+
+func _build_ring_city(world: Node3D, c1: Color, c2: Color) -> void:
+	# Tours concentriques avec anneaux suspendus.
+	for i in 18:
+		var a: float = TAU * float(i) / 18.0
+		var radius: float = 6.5 + float(i % 3) * 3.2
+		var h: float = 2.8 + float(i % 6) * 0.75
+
+		var tower: MeshInstance3D = MeshInstance3D.new()
+		var bm: BoxMesh = BoxMesh.new()
+		bm.size = Vector3(0.85, h, 0.85)
+		tower.mesh = bm
+		tower.material_override = _mat(c1.darkened(0.38), 0.55)
+		tower.position = Vector3(cos(a) * radius, h * 0.5, sin(a) * radius - 3.0)
+		tower.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		world.add_child(tower)
+
+		if i % 2 == 0:
+			var halo: MeshInstance3D = MeshInstance3D.new()
+			var tm: TorusMesh = TorusMesh.new()
+			tm.inner_radius = 1.0 + float(i % 4) * 0.22
+			tm.outer_radius = tm.inner_radius + 0.09
+			tm.rings = 28
+			tm.ring_segments = 7
+			halo.mesh = tm
+			halo.material_override = _mat(c2, 2.3, true)
+			halo.position = tower.position + Vector3(0.0, h * 0.55, 0.0)
+			halo.rotation.x = PI * 0.5
+			halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			world.add_child(halo)
+
+	# Porte monumentale.
+	var gate: MeshInstance3D = MeshInstance3D.new()
+	var gtm: TorusMesh = TorusMesh.new()
+	gtm.inner_radius = 4.0
+	gtm.outer_radius = 4.18
+	gtm.rings = 48
+	gtm.ring_segments = 8
+	gate.mesh = gtm
+	gate.material_override = _mat(c1.lightened(0.18), 2.5, true)
+	gate.position = Vector3(0.0, 4.2, -12.0)
+	gate.rotation.x = PI * 0.5
+	gate.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	world.add_child(gate)
+
+
+func _build_luminous_abyss(world: Node3D, c1: Color, c2: Color) -> void:
+	# Plateau central sombre entouré de piliers descendant dans un faux vide.
+	var pit: MeshInstance3D = MeshInstance3D.new()
+	var pm: CylinderMesh = CylinderMesh.new()
+	pm.top_radius = 9.0
+	pm.bottom_radius = 12.0
+	pm.height = 5.0
+	pm.radial_segments = 40
+	pit.mesh = pm
+	pit.material_override = _mat(Color(0.008, 0.014, 0.045, 1.0))
+	pit.position = Vector3(0.0, -2.65, -3.0)
+	pit.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	world.add_child(pit)
+
+	var beam_mesh: BoxMesh = BoxMesh.new()
+	beam_mesh.size = Vector3(0.14, 1.0, 0.14)
+	beam_mesh.material = _instance_color_mat()
+
+	var mm: MultiMesh = MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.instance_count = 44
+	mm.mesh = beam_mesh
+
+	var node: MultiMeshInstance3D = MultiMeshInstance3D.new()
+	node.name = "PiliersAbyssaux"
+	node.multimesh = mm
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	world.add_child(node)
+
+	for i in 44:
+		var a: float = TAU * float(i) / 44.0
+		var radius: float = 10.5 + float(i % 4) * 2.0
+		var h: float = 4.5 + float(i % 8) * 0.75
+		var pos: Vector3 = Vector3(cos(a) * radius, -h * 0.5 + 0.2, sin(a) * radius - 3.0)
+		var b: Basis = Basis().scaled(Vector3(1.0, h, 1.0))
+		mm.set_instance_transform(i, Transform3D(b, pos))
+		mm.set_instance_color(i, c1 if i % 2 == 0 else c2)
+
+	for k in 4:
+		var abyss_ring: MeshInstance3D = MeshInstance3D.new()
+		var tm: TorusMesh = TorusMesh.new()
+		tm.inner_radius = 4.6 + float(k) * 2.1
+		tm.outer_radius = 4.72 + float(k) * 2.1
+		tm.rings = 40
+		tm.ring_segments = 7
+		abyss_ring.mesh = tm
+		abyss_ring.material_override = _mat(c2 if k % 2 == 0 else c1, 2.0, true)
+		abyss_ring.position = Vector3(0.0, -1.0 - float(k) * 1.0, -3.0)
+		abyss_ring.rotation.x = PI * 0.5
+		abyss_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		world.add_child(abyss_ring)
 
 
 func _try_visit_planet() -> void:
