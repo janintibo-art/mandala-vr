@@ -1,4 +1,4 @@
-[gd_scene load_steps=33 format=3]
+[gd_scene load_steps=30 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/v8_manager.gd" id="2"]
@@ -28,10 +28,7 @@
 [ext_resource type="Script" path="res://scripts/v39_manager.gd" id="26"]
 [ext_resource type="Script" path="res://scripts/v40_manager.gd" id="27"]
 [ext_resource type="Script" path="res://scripts/v41_manager.gd" id="28"]
-[ext_resource type="Script" path="res://scripts/v43_manager.gd" id="29"]
-[ext_resource type="Script" path="res://scripts/v44_manager.gd" id="30"]
-[ext_resource type="Script" path="res://scripts/v45_manager.gd" id="31"]
-[ext_resource type="Script" path="res://scripts/v46_manager.gd" id="32"]
+[ext_resource type="Script" path="res://scripts/v52_visual_manager.gd" id="29"]
 [ext_resource type="Script" path="res://scripts/v47_manager.gd" id="33"]
 
 [node name="Main" type="Node3D"]
@@ -118,17 +115,11 @@ script = ExtResource("27")
 [node name="V41Manager" type="Node" parent="."]
 script = ExtResource("28")
 
-[node name="V43Manager" type="Node" parent="."]
+[node name="V52VisualManager" type="Node" parent="."]
 script = ExtResource("29")
 
-[node name="V44Manager" type="Node" parent="."]
-script = ExtResource("30")
 
-[node name="V45Manager" type="Node" parent="."]
-script = ExtResource("31")
 
-[node name="V46Manager" type="Node" parent="."]
-script = ExtResource("32")
 
 [node name="V47Manager" type="Node" parent="."]
 script = ExtResource("33")

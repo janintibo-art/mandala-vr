@@ -44,7 +44,7 @@ var v29 = null
 var v31 = null
 var v32 = null
 var v33 = null
-var v46 = null
+var v52_visual = null
 
 var _installe: bool = false
 var _actif: bool = false
@@ -123,7 +123,7 @@ func _ready() -> void:
 	v31 = app.get_node_or_null("V31Manager")
 	v32 = app.get_node_or_null("V32Manager")
 	v33 = app.get_node_or_null("V33Manager")
-	v46 = app.get_node_or_null("V46Manager")
+	v52_visual = app.get_node_or_null("V52VisualManager")
 	process_priority = 400
 	_rng.randomize()
 
@@ -141,7 +141,7 @@ func _process(dt: float) -> void:
 			and v26 != null and bool(v26.get("_installe"))
 			and v32 != null and bool(v32.get("_installe"))
 			and v33 != null and bool(v33.get("_installe"))
-			and v46 != null and bool(v46.get("_installe"))
+			and v52_visual != null and bool(v52_visual.get("_installe"))
 		)
 		if ready_ok:
 			_installer()
