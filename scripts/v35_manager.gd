@@ -91,7 +91,6 @@ func _installer() -> void:
 	_creer_nacelle()
 	_creer_chute_v2()
 	_creer_course_v2()
-	app.message("v35 : moteur de sensations v2 actif")
 
 
 func _mat_glow(c: Color, energie: float = 2.0) -> StandardMaterial3D:
@@ -234,19 +233,9 @@ func _maj_tunnel_scenarise(dt: float) -> void:
 			clampf(dt * 3.2, 0.0, 1.0))
 
 
-func _annoncer_stage(stage: int) -> void:
-	if _message_cooldown > 0.0:
-		return
-	_message_cooldown = 1.0
-	match stage:
-		0:
-			app.message("MONTEE...")
-		1:
-			app.message("SOMMET...")
-		2:
-			app.message("BASCULE !")
-		_:
-			app.message("PLEINE VITESSE")
+func _annoncer_stage(_stage: int) -> void:
+	# v42 : transitions uniquement visuelles, aucun texte en plein trajet.
+	pass
 
 
 func _maj_rupture_v2() -> void:
@@ -363,7 +352,6 @@ func _debut_chute_v2() -> void:
 	_chute_root.visible = true
 	if _nacelle != null:
 		_nacelle.visible = true
-	app.message("CHUTE LIBRE")
 
 
 func _cacher_chute_v2() -> void:
@@ -509,8 +497,3 @@ func _maj_course_v2(_dt: float) -> void:
 		var mondes: Array = [1, 11, 3, 6, 9, 19]
 		tunnel_mat.set_shader_parameter("world_index", int(mondes[secteur]))
 
-	var hud_v: Variant = v33.get("_hud")
-	if hud_v is Label3D:
-		var hud: Label3D = hud_v
-		if not hud.text.contains("SECTEUR"):
-			hud.text += "  |  SECTEUR " + str(secteurs[secteur])

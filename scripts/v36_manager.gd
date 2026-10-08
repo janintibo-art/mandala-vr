@@ -97,7 +97,6 @@ func _process(_dt: float) -> void:
 func _installer() -> void:
 	_installe = true
 	_creer_course_v36()
-	app.message("v36 : directeur de parcours actif")
 
 
 # =====================================================================
@@ -152,17 +151,9 @@ func _maj_death_director() -> void:
 	_redessiner_death_tunnel(chapitre, ratio)
 
 
-func _annonce_death(chapitre: int, acte: int) -> void:
-	var c: int = mini(chapitre, 5)
-	var noms: Array = [
-		["ASCENSION", "CRETE", "PREMIERE PLONGEE", "SPRINT"],
-		["HELICE", "RESSERREMENT", "DOUBLE SPIRALE", "EJECTION"],
-		["GALERIE", "OUVERTURE SUR LE VIDE", "PLONGEE ABYSSALE", "RETOUR"],
-		["CATHEDRALE", "COMPRESSION", "TEMPETE", "FAILLE"],
-		["FRACTURE", "SAUTS DE TUNNEL", "PASSAGE ETROIT", "RUPTURE"],
-		["CHAOS", "ZERO-G", "TUNNEL IMPOSSIBLE", "FIN DU MONDE"],
-	]
-	app.message(str(noms[c][acte]))
+func _annonce_death(_chapitre: int, _acte: int) -> void:
+	# v42 : le decor annonce lui-meme les changements.
+	pass
 
 
 func _death_point(d: float, chapitre: int, ratio: float) -> Vector3:
@@ -541,7 +532,6 @@ func _maj_course_director() -> void:
 
 	if secteur != _course_sector_avant:
 		_course_sector_avant = secteur
-		app.message("SECTEUR : " + str(COURSE_NAMES[secteur]))
 
 	# Route / sol.
 	for i in COURSE_SEGMENTS:
@@ -612,11 +602,6 @@ func _maj_course_director() -> void:
 		var energies: Array = [1.9, 2.5, 1.7, 2.1, 2.8, 3.1]
 		_course_glow.emission_energy_multiplier = float(energies[secteur])
 
-	# HUD : nom du secteur ajoute apres le HUD v33/v35.
-	var hud_v: Variant = v33.get("_hud")
-	if hud_v is Label3D:
-		var hud: Label3D = hud_v
-		hud.text += "  |  " + str(COURSE_NAMES[secteur])
 
 
 func _debut_course_v36() -> void:

@@ -81,7 +81,6 @@ func _installer() -> void:
 
 	_creer_death_events()
 	_creer_course_events()
-	app.message("v39 : evenements de parcours actifs")
 
 
 func _glow(c: Color, energie: float) -> StandardMaterial3D:
@@ -194,13 +193,6 @@ func _maj_death_events() -> void:
 
 	if key != _death_event_key:
 		_death_event_key = key
-		var noms: Array = [
-			"IRIS",
-			"PORTIQUE",
-			"FAUX MUR",
-			"TRAVERSES",
-		]
-		app.message("EVENEMENT : " + str(noms[(chapitre + acte) % noms.size()]))
 
 	_hide_all(_death_rings)
 	_hide_all(_death_panels)
@@ -374,13 +366,6 @@ func _maj_course_events() -> void:
 
 	if key != _course_event_key:
 		_course_event_key = key
-		var noms: Array = [
-			"PORTES",
-			"ANNEAUX GEANTS",
-			"COLONNES",
-			"FAILLE",
-		]
-		app.message("COURSE : " + str(noms[(secteur + demi) % noms.size()]))
 
 	_hide_all(_course_rings)
 	_hide_all(_course_panels)

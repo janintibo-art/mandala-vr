@@ -109,7 +109,6 @@ func _installer() -> void:
 	col.move_child(_barre, app.panneau._bas.get_index())
 
 	_synchroniser()
-	app.message("Menu v34 : navigation unifiee")
 
 
 func _pastille(b: Button, rayon: int, taille: int) -> void:

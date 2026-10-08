@@ -131,7 +131,6 @@ func _installer() -> void:
 	_creer_hud()
 	_creer_page_course()
 	app.panneau.rafraichir()
-	app.message("v34 : Course tunnel disponible depuis Experiences")
 
 
 func _creer_page_course() -> void:

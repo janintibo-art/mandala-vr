@@ -145,7 +145,6 @@ func _installer() -> void:
 		app.panneau.onglets.current_tab = _scroll_accueil.get_index()
 
 	app.panneau.rafraichir()
-	app.message("v34 : Accueil unifie + Grand 8 progressif")
 
 
 func _creer_accueil() -> void:
@@ -415,7 +414,6 @@ func _appliquer_chapitre() -> void:
 
 	if app != null:
 		app.set_monde(int(MONDES_CHAPITRES[idx]))
-		app.message("CHAPITRE %d - %s" % [idx + 1, str(NOMS_CHAPITRES[idx])])
 
 
 func _maj_tunnel_mort(dt: float) -> void:
@@ -432,7 +430,6 @@ func _maj_tunnel_mort(dt: float) -> void:
 		_etat_mort = ETAT_RUPTURE
 		_phase_t = 0.0
 		_vibrer(0.55, 0.20)
-		app.message("RUPTURE - CHUTE LIBRE")
 
 
 func _maj_rupture() -> void:
@@ -473,7 +470,6 @@ func _maj_chute(dt: float) -> void:
 		v31.set("_courbes", 1.62)
 		v31.call("_set_cine", 4)
 		_vibrer(0.82, 0.30)
-		app.message("ASPIRATION - REENTREE !")
 
 
 func _maj_reentree() -> void:

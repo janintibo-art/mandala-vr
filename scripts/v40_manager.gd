@@ -61,7 +61,6 @@ func _installer() -> void:
 	_installe = true
 	_creer_death_pre()
 	_creer_course_pre()
-	app.message("v40 : mise en scene dynamique active")
 
 
 func _glow(c: Color, energie: float) -> StandardMaterial3D:

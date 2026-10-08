@@ -96,7 +96,6 @@ func _installer() -> void:
 	_installe = true
 	_creer_death_world()
 	_creer_course_branches()
-	app.message("v41 : parcours vivant actif")
 
 
 func _glow(c: Color, energie: float) -> StandardMaterial3D:
@@ -415,7 +414,6 @@ func _maj_course_branches() -> void:
 		_branch_index = index
 		_branch_locked = false
 		_branch_side = 0.0
-		app.message("BIFURCATION : choisis gauche ou droite")
 
 	var u: float = clampf((local_m - debut) / BRANCH_WINDOW, 0.0, 1.0)
 
@@ -429,7 +427,6 @@ func _maj_course_branches() -> void:
 			# Si le joueur reste centre, alterne automatiquement les branches.
 			_branch_side = -1.0 if index % 2 == 0 else 1.0
 		_branch_locked = true
-		app.message("BRANCHE GAUCHE" if _branch_side < 0.0 else "BRANCHE DROITE")
 
 	# Divergence puis reunion.
 	var separation: float = sin(PI * u)

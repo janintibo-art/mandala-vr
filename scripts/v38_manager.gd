@@ -97,7 +97,6 @@ func _installer() -> void:
 	_installe = true
 	_creer_death_flux()
 	_creer_course_flux()
-	app.message("v38 : flux de proximite actif")
 
 
 func _glow(c: Color, energie: float) -> StandardMaterial3D:
