@@ -1,6 +1,11 @@
 class_name V47Manager
 extends Node
-## Mandala VR v47/v48 : Tir Mandala.
+## Mandala VR v47/v48/v49 : Tir Mandala.
+##
+## v49 :
+## - boss en 3 phases avec coeur final ;
+## - bonus temporaires automatiques : triple, ralenti, bouclier, chaine ;
+## - recompenses de score et combo sans nouvel encombrement visuel.
 ##
 ## v48 :
 ## - page Tir dediee dans Experiences ;
@@ -20,6 +25,11 @@ const TYPE_BLINDEE: int = 2
 const TYPE_BOMBE: int = 3
 const TYPE_DIVISEE: int = 4
 const TYPE_BOUCLIER: int = 5
+
+const BONUS_TRIPLE: int = 0
+const BONUS_SLOW: int = 1
+const BONUS_SHIELD: int = 2
+const BONUS_CHAIN: int = 3
 
 const MAX_TARGETS: int = 18
 const BURST_SLOTS: int = 10
@@ -74,6 +84,12 @@ var _spawn_t: float = 0.0
 var _spawn_serial: int = 0
 var _wanted_color: int = 0
 
+# Bonus temporaires, gagnes automatiquement avec le score.
+var _bonus_type: int = -1
+var _bonus_t: float = 0.0
+var _bonus_cycle: int = 0
+var _next_bonus_score: int = 1800
+
 # Boss
 var _boss_root: Node3D = null
 var _boss_core: MeshInstance3D = null
@@ -82,6 +98,9 @@ var _boss_shield: Node3D = null
 var _boss_weakpoints: Array = []
 var _boss_active: bool = false
 var _boss_t: float = 0.0
+var _boss_phase: int = 1
+var _boss_core_open: bool = false
+var _boss_core_hp: int = 6
 
 # 0 Zen, 1 Arcade, 2 Chaos
 var _difficulty: int = 1
@@ -161,11 +180,13 @@ func _process(dt: float) -> void:
 
 	if _running:
 		_game_t += dt
+		_update_bonus(dt)
+		var game_dt: float = dt * _time_factor()
 
 		if _boss_active:
-			_update_boss(dt)
+			_update_boss(game_dt)
 		else:
-			_wave_t += dt
+			_wave_t += game_dt
 			if _wave_t >= 16.0:
 				_wave_t -= 16.0
 				_wave += 1
@@ -174,13 +195,13 @@ func _process(dt: float) -> void:
 					_start_boss()
 
 			if not _boss_active:
-				_spawn_t -= dt
+				_spawn_t -= game_dt
 				if _spawn_t <= 0.0:
 					_spawn_target()
 					var accel: float = pow(0.94, float(_wave - 1))
 					_spawn_t = maxf(0.25, _spawn_base * accel)
 
-				_update_targets(dt)
+				_update_targets(game_dt)
 
 		if shot_d:
 			_shoot_from(app.main_d, 0)
@@ -655,9 +676,16 @@ func _start_round() -> void:
 	_spawn_t = 0.15
 	_spawn_serial = 0
 	_wanted_color = 0
+	_bonus_type = -1
+	_bonus_t = 0.0
+	_bonus_cycle = 0
+	_next_bonus_score = 1800
 	_running = true
 	_boss_active = false
 	_boss_t = 0.0
+	_boss_phase = 1
+	_boss_core_open = false
+	_boss_core_hp = 6
 	_boss_root.visible = false
 	_disable_all_targets()
 	_reset_boss_weakpoints()
@@ -916,12 +944,18 @@ func _update_targets(dt: float) -> void:
 		if missed:
 			_spawn_burst(pos, 0.65)
 			_deactivate_target(i)
-			_combo = 0
-			_lives -= 1
-			_haptic_both(0.22, 0.06)
-			if _lives <= 0:
-				_game_over()
-				return
+
+			if _bonus_type == BONUS_SHIELD and _bonus_t > 0.0:
+				# Le bouclier absorbe les cibles ratees pendant sa duree.
+				_score += 15
+				_haptic_both(0.12, 0.04)
+			else:
+				_combo = 0
+				_lives -= 1
+				_haptic_both(0.22, 0.06)
+				if _lives <= 0:
+					_game_over()
+					return
 
 		_targets[i] = t
 
@@ -952,7 +986,10 @@ func _shoot_from(controller: XRController3D, hand: int) -> void:
 		var boss_hit: Dictionary = _boss_ray_hit(ray_o, ray_d)
 		if not boss_hit.is_empty():
 			var length: float = float(boss_hit["t"])
-			_hit_boss_weakpoint(int(boss_hit["index"]), controller)
+			if bool(boss_hit.get("core", false)):
+				_hit_boss_core(controller)
+			else:
+				_hit_boss_weakpoint(int(boss_hit["index"]), controller)
 			_show_laser(hand, clampf(length, 0.4, 28.0))
 			return
 
@@ -1034,6 +1071,7 @@ func _hit_target(i: int, controller: XRController3D) -> void:
 		_targets[i] = t
 		_score += 35
 		_combo += 1
+		_maybe_bonus()
 		controller.trigger_haptic_pulse("haptic", 0.0, 0.28, 0.045, 0.0)
 		return
 
@@ -1071,6 +1109,9 @@ func _hit_target(i: int, controller: XRController3D) -> void:
 	elif type_id == TYPE_DIVISEE:
 		_split_target(pos, int(t["color_id"]))
 
+	_bonus_followup(pos)
+	_maybe_bonus()
+
 
 func _split_target(center: Vector3, color_id: int) -> void:
 	for side in [-1.0, 1.0]:
@@ -1101,6 +1142,7 @@ func _bomb_area(center: Vector3) -> void:
 	if destroyed > 0:
 		_score += destroyed * 140
 		_combo += destroyed
+		_maybe_bonus()
 		_haptic_both(0.34, 0.07)
 
 
@@ -1133,9 +1175,100 @@ func _update_lasers(dt: float) -> void:
 
 
 # =====================================================================
+# Bonus de combo / score
+
+func _update_bonus(dt: float) -> void:
+	if _bonus_t <= 0.0:
+		_bonus_t = 0.0
+		_bonus_type = -1
+		return
+
+	_bonus_t -= dt
+	if _bonus_t <= 0.0:
+		_bonus_t = 0.0
+		_bonus_type = -1
+
+
+func _time_factor() -> float:
+	if _bonus_type == BONUS_SLOW and _bonus_t > 0.0:
+		return 0.52
+	return 1.0
+
+
+func _maybe_bonus() -> void:
+	if _score < _next_bonus_score:
+		return
+
+	_bonus_type = _bonus_cycle % 4
+	_bonus_cycle += 1
+	_bonus_t = 8.0
+	_next_bonus_score += 2200
+
+	# Petite confirmation uniquement haptique, pas de popup au milieu de la vue.
+	_haptic_both(0.24, 0.055)
+
+
+func _bonus_followup(center: Vector3) -> void:
+	if _bonus_t <= 0.0:
+		return
+
+	var limit: int = 0
+	var radius: float = 0.0
+
+	if _bonus_type == BONUS_TRIPLE:
+		# Deux impacts lateraux automatiques autour du point touche.
+		limit = 2
+		radius = 4.6
+	elif _bonus_type == BONUS_CHAIN:
+		# Reaction en chaine plus large.
+		limit = 5
+		radius = 3.6
+	else:
+		return
+
+	var candidates: Array = []
+
+	for i in _targets.size():
+		var td: Dictionary = _targets[i]
+		if not bool(td["active"]):
+			continue
+
+		var node: Node3D = td["node"]
+		var dist: float = node.position.distance_to(center)
+		if dist <= radius:
+			candidates.append({"i": i, "d": dist})
+
+	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a["d"]) < float(b["d"]))
+
+	var killed: int = 0
+	for item_v in candidates:
+		if killed >= limit:
+			break
+		var item: Dictionary = item_v
+		var idx: int = int(item["i"])
+		var td: Dictionary = _targets[idx]
+		if not bool(td["active"]):
+			continue
+
+		var node: Node3D = td["node"]
+		_spawn_burst(node.position, 0.82 if _bonus_type == BONUS_TRIPLE else 1.05)
+		_deactivate_target(idx)
+		_score += 95 if _bonus_type == BONUS_TRIPLE else 125
+		_combo += 1
+		killed += 1
+
+
+# =====================================================================
 # Boss Mandala
 
 func _reset_boss_weakpoints() -> void:
+	_boss_phase = 1
+	_boss_core_open = false
+	_boss_core_hp = 6
+	_boss_core.scale = Vector3.ONE
+	_boss_shield.visible = true
+
 	for i in _boss_weakpoints.size():
 		var d: Dictionary = _boss_weakpoints[i]
 		d["active"] = true
@@ -1150,6 +1283,9 @@ func _start_boss() -> void:
 	_reset_boss_weakpoints()
 	_boss_active = true
 	_boss_t = 0.0
+	_boss_phase = 1
+	_boss_core_open = false
+	_boss_core_hp = 6
 	_boss_root.visible = true
 	_boss_root.position = Vector3(0.0, 0.2, -15.5)
 	_boss_root.rotation = Vector3.ZERO
@@ -1158,20 +1294,60 @@ func _start_boss() -> void:
 
 func _update_boss(dt: float) -> void:
 	_boss_t += dt
-	_boss_root.rotation.z += dt * 0.18
-	_boss_shield.rotation.z -= dt * 0.62
-	_boss_ring.rotation.z += dt * 0.34
 
-	var approach: float = clampf(_boss_t / 26.0, 0.0, 1.0)
-	_boss_root.position.z = lerpf(-15.5, -7.5, approach)
-	_boss_root.position.x = sin(_boss_t * 0.42) * 1.25
-	_boss_root.position.y = 0.15 + sin(_boss_t * 0.65) * 0.55
+	var remaining: int = _boss_remaining()
+	if remaining > 5:
+		_boss_phase = 1
+	elif remaining > 0:
+		_boss_phase = 2
+	else:
+		_boss_phase = 3
+		_boss_core_open = true
 
-	if _boss_t >= 27.0:
+	var root_speed: float = 0.18
+	var shield_speed: float = 0.62
+	var ring_speed: float = 0.34
+	var lateral: float = 1.25
+	var vertical: float = 0.55
+	var approach_end: float = -7.5
+
+	if _boss_phase == 2:
+		root_speed = 0.32
+		shield_speed = 1.28
+		ring_speed = 0.66
+		lateral = 2.0
+		vertical = 0.95
+		approach_end = -6.8
+	elif _boss_phase == 3:
+		root_speed = 0.48
+		shield_speed = 0.0
+		ring_speed = 1.05
+		lateral = 1.55
+		vertical = 0.80
+		approach_end = -6.0
+
+	_boss_root.rotation.z += dt * root_speed
+	_boss_shield.rotation.z -= dt * shield_speed
+	_boss_ring.rotation.z += dt * ring_speed
+	_boss_shield.visible = _boss_phase < 3
+
+	var approach: float = clampf(_boss_t / 34.0, 0.0, 1.0)
+	_boss_root.position.z = lerpf(-15.5, approach_end, approach)
+	_boss_root.position.x = sin(_boss_t * (0.42 + float(_boss_phase) * 0.08)) * lateral
+	_boss_root.position.y = 0.15 + sin(_boss_t * (0.65 + float(_boss_phase) * 0.10)) * vertical
+
+	if _boss_phase == 3:
+		var pulse: float = 1.0 + sin(_boss_t * 5.5) * 0.18
+		_boss_core.scale = Vector3.ONE * pulse
+	else:
+		_boss_core.scale = Vector3.ONE
+
+	if _boss_t >= 36.0:
 		_boss_active = false
 		_boss_root.visible = false
 		_combo = 0
-		_lives -= 2
+		if not (_bonus_type == BONUS_SHIELD and _bonus_t > 0.0):
+			_lives -= 2
 		_haptic_both(0.42, 0.09)
 		if _lives <= 0:
 			_game_over()
@@ -1180,7 +1356,26 @@ func _update_boss(dt: float) -> void:
 			_wave_t = 0.0
 
 
+func _boss_remaining() -> int:
+	var left: int = 0
+	for d_v in _boss_weakpoints:
+		var d: Dictionary = d_v
+		if bool(d["active"]):
+			left += 1
+	return left
+
+
 func _boss_ray_hit(ray_o: Vector3, ray_d: Vector3) -> Dictionary:
+	# Phase finale : le coeur central devient la cible.
+	if _boss_core_open:
+		var core_centre: Vector3 = _boss_core.global_position
+		var core_vec: Vector3 = core_centre - ray_o
+		var core_t: float = core_vec.dot(ray_d)
+		if core_t > 0.0:
+			var core_closest: Vector3 = ray_o + ray_d * core_t
+			if core_closest.distance_to(core_centre) <= 0.62:
+				return {"core": true, "t": core_t}
+
 	var best_i: int = -1
 	var best_t: float = 9999.0
 
@@ -1218,12 +1413,14 @@ func _hit_boss_weakpoint(i: int, controller: XRController3D) -> void:
 
 	if hp > 0:
 		_score += 80
+		_maybe_bonus()
 		controller.trigger_haptic_pulse("haptic", 0.0, 0.30, 0.045, 0.0)
 	else:
 		d["active"] = false
 		wp.visible = false
 		_score += 320
 		_combo += 2
+		_maybe_bonus()
 		_spawn_burst(_root.to_local(wp.global_position), 1.15)
 		controller.trigger_haptic_pulse("haptic", 0.0, 0.52, 0.06, 0.0)
 
@@ -1234,7 +1431,30 @@ func _hit_boss_weakpoint(i: int, controller: XRController3D) -> void:
 		if bool(x["active"]):
 			return
 
-	_boss_defeat()
+	# Tous les satellites sont detruits : ouverture de la phase finale.
+	_boss_phase = 3
+	_boss_core_open = true
+	_boss_core_hp = 6
+	_boss_shield.visible = false
+	_spawn_burst(_boss_root.position, 1.85)
+	_haptic_both(0.46, 0.08)
+
+
+func _hit_boss_core(controller: XRController3D) -> void:
+	if not _boss_core_open:
+		return
+
+	_boss_core_hp -= 1
+	_score += 220
+	_combo += 1
+	_maybe_bonus()
+	controller.trigger_haptic_pulse("haptic", 0.0, 0.52, 0.055, 0.0)
+
+	var pulse_strength: float = 1.0 + float(6 - _boss_core_hp) * 0.12
+	_spawn_burst(_boss_root.position, pulse_strength)
+
+	if _boss_core_hp <= 0:
+		_boss_defeat()
 
 
 func _boss_defeat() -> void:
@@ -1243,7 +1463,9 @@ func _boss_defeat() -> void:
 	_spawn_burst(_boss_root.position + Vector3(-0.8, -0.4, 0.0), 1.65)
 	_score += 2500 + _wave * 120
 	_combo += 8
+	_maybe_bonus()
 	_boss_active = false
+	_boss_core_open = false
 	_boss_root.visible = false
 	_spawn_t = 0.35
 	_wave_t = 0.0
@@ -1358,23 +1580,28 @@ func _update_hud() -> void:
 
 	var extra: String = ""
 	if _boss_active:
-		var left: int = 0
-		for d_v in _boss_weakpoints:
-			var d: Dictionary = d_v
-			if bool(d["active"]):
-				left += 1
-		extra = "  BOSS %d/8" % left
+		var left: int = _boss_remaining()
+		if _boss_phase < 3:
+			extra = "  BOSS P%d %d/8" % [_boss_phase, left]
+		else:
+			extra = "  BOSS P3 COEUR %d" % _boss_core_hp
 	elif _precision_wave():
 		var noms: Array = ["BLEU", "ROSE", "OR"]
 		extra = "  C:" + str(noms[_wanted_color])
 	elif _wave_360():
 		extra = "  360"
 
-	_hud.text = "%d   x%d\nV%d%s  %s" % [
+	var bonus: String = ""
+	if _bonus_type >= 0 and _bonus_t > 0.0:
+		var bonus_names: Array = ["TRIPLE", "RALENTI", "BOUCLIER", "CHAINE"]
+		bonus = "  B:" + str(bonus_names[_bonus_type]) + " %ds" % int(ceil(_bonus_t))
+
+	_hud.text = "%d   x%d\nV%d%s%s  %s" % [
 		_score,
 		maxi(1, _combo),
 		_wave,
 		extra,
+		bonus,
 		hearts]
 
 
