@@ -1,5 +1,6 @@
 class_name V38Manager
 extends Node
+## v51 : ordonnancement optimise des couches decoratives Quest.
 ## Mandala VR v38 : flux de proximite.
 ##
 ## Le parcours v36 reste intact, mais on remet le "bombardement visuel"
@@ -27,6 +28,8 @@ var v33 = null
 var v36 = null
 
 var _installe: bool = false
+var _death_prev_active: bool = false
+var _course_prev_active: bool = false
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 # Grand 8
@@ -86,8 +89,19 @@ func _process(_dt: float) -> void:
 			_installer()
 		return
 
-	_maj_death_flux()
-	_maj_course_flux()
+	var death_active: bool = bool(v32.get("_mort"))
+	var course_active: bool = bool(v33.get("_actif"))
+
+	# v51 : les couches decoratives ne travaillent que dans le mode actif.
+	# Une derniere mise a jour est executee a la sortie pour masquer proprement
+	# les geometries avant de mettre la couche au repos.
+	if death_active or _death_prev_active:
+		_maj_death_flux()
+	if course_active or _course_prev_active:
+		_maj_course_flux()
+
+	_death_prev_active = death_active
+	_course_prev_active = course_active
 
 
 # =====================================================================

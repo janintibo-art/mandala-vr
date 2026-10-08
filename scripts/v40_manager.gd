@@ -1,5 +1,6 @@
 class_name V40Manager
 extends Node
+## v51 : ordonnancement optimise des couches decoratives Quest.
 ## Mandala VR v40 : mise en scene dynamique.
 ## Chaque evenement suit preparation -> tension -> climax -> relance.
 
@@ -14,6 +15,8 @@ var v38 = null
 var v39 = null
 
 var _installe: bool = false
+var _death_prev_active: bool = false
+var _course_prev_active: bool = false
 var _death_root: Node3D = null
 var _death_pre: Array = []
 var _death_pre_mat: StandardMaterial3D = null
@@ -53,8 +56,19 @@ func _process(_dt: float) -> void:
 		if pret:
 			_installer()
 		return
-	_maj_death_scene()
-	_maj_course_scene()
+	var death_active: bool = bool(v32.get("_mort"))
+	var course_active: bool = bool(v33.get("_actif"))
+
+	# v51 : les couches decoratives ne travaillent que dans le mode actif.
+	# Une derniere mise a jour est executee a la sortie pour masquer proprement
+	# les geometries avant de mettre la couche au repos.
+	if death_active or _death_prev_active:
+		_maj_death_scene()
+	if course_active or _course_prev_active:
+		_maj_course_scene()
+
+	_death_prev_active = death_active
+	_course_prev_active = course_active
 
 
 func _installer() -> void:

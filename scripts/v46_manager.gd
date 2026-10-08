@@ -1,5 +1,6 @@
 class_name V46Manager
 extends Node
+## v51 : ordonnancement optimise des couches decoratives Quest.
 ## Mandala VR v46 : echelle et vertige.
 ##
 ## On ajoute des reperes lointains, pas du bruit proche :
@@ -24,6 +25,9 @@ var v36 = null
 var v45 = null
 
 var _installe: bool = false
+var _death_prev_active: bool = false
+var _course_prev_active: bool = false
+var _slow_flip: bool = false
 
 # Grand 8
 var _death_root: Node3D = null
@@ -74,8 +78,22 @@ func _process(_dt: float) -> void:
 			_installer()
 		return
 
-	_maj_death_scale()
-	_maj_course_scale()
+	_slow_flip = not _slow_flip
+	var death_active: bool = bool(v32.get("_mort"))
+	var course_active: bool = bool(v33.get("_actif"))
+
+	# v51 : les couches decoratives ne travaillent que dans le mode actif.
+	# Une derniere mise a jour est executee a la sortie pour masquer proprement
+	# les geometries avant de mettre la couche au repos.
+	if death_active or _death_prev_active:
+		if death_active != _death_prev_active or _slow_flip:
+			_maj_death_scale()
+	if course_active or _course_prev_active:
+		if course_active != _course_prev_active or _slow_flip:
+			_maj_course_scale()
+
+	_death_prev_active = death_active
+	_course_prev_active = course_active
 
 
 func _installer() -> void:
