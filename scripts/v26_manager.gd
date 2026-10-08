@@ -9,7 +9,7 @@ const GROUPES: Array = [
 	["Accueil", ["Accueil"]],
 	["Creer", ["Rapide", "Modeles", "Genres", "Trait"]],
 	["Univers", ["Couleurs", "Lumiere", "Style", "Eclat", "Monde"]],
-	["Experiences", ["Sensations", "Course", "Tir", "Diffusion"]],
+	["Experiences", ["Sensations", "Course", "Tir", "Observatoire", "Diffusion"]],
 	["Galerie", ["Creations"]],
 	["Reglages", ["Mouvement", "Relief", "V8"]],
 ]

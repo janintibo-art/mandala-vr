@@ -1,4 +1,4 @@
-[gd_scene load_steps=27 format=3]
+[gd_scene load_steps=28 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/v8_manager.gd" id="2"]
@@ -27,6 +27,7 @@
 [ext_resource type="Script" path="res://scripts/v53_ride_fx_manager.gd" id="25"]
 [ext_resource type="Script" path="res://scripts/v52_visual_manager.gd" id="29"]
 [ext_resource type="Script" path="res://scripts/v47_manager.gd" id="33"]
+[ext_resource type="Script" path="res://scripts/v56_observatoire_manager.gd" id="34"]
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1")
@@ -114,3 +115,6 @@ script = ExtResource("29")
 
 [node name="V47Manager" type="Node" parent="."]
 script = ExtResource("33")
+
+[node name="V56ObservatoireManager" type="Node" parent="."]
+script = ExtResource("34")
