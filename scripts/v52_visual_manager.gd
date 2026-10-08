@@ -17,7 +17,7 @@ var v31 = null
 var v32 = null
 var v33 = null
 var v36 = null
-var v41 = null
+var v53_fx = null
 
 var _installe: bool = false
 var _death_prev_active: bool = false
@@ -36,7 +36,7 @@ func _ready() -> void:
 	v32 = app.get_node_or_null("V32Manager")
 	v33 = app.get_node_or_null("V33Manager")
 	v36 = app.get_node_or_null("V36Manager")
-	v41 = app.get_node_or_null("V41Manager")
+	v53_fx = app.get_node_or_null("V53RideFXManager")
 	process_priority = 340
 
 
@@ -50,7 +50,7 @@ func _process(_dt: float) -> void:
 			and v32 != null and bool(v32.get("_installe"))
 			and v33 != null and bool(v33.get("_installe"))
 			and v36 != null and bool(v36.get("_installe"))
-			and v41 != null and bool(v41.get("_installe"))
+			and v53_fx != null and bool(v53_fx.get("_installe"))
 		)
 		if ready_ok:
 			_installer()
