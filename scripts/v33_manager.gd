@@ -18,6 +18,7 @@ var v8 = null
 var v29 = null
 var v31 = null
 var v32 = null
+var v36 = null
 var _installe: bool = false
 
 var _actif: bool = false
@@ -55,6 +56,7 @@ func _ready() -> void:
 	v29 = app.get_node_or_null("V29Manager")
 	v31 = app.get_node_or_null("V31Manager")
 	v32 = app.get_node_or_null("V32Manager")
+	v36 = app.get_node_or_null("V36Manager")
 	process_priority = 270
 	_charger()
 
@@ -540,7 +542,13 @@ func _maj_course(dt: float) -> void:
 
 	_bord_cooldown = maxf(0.0, _bord_cooldown - dt)
 
-	_maj_piste()
+	# v50 : depuis v36, la piste, les rails et le tunnel v33 sont caches
+	# et remplaces par le directeur de parcours. Continuer a recalculer
+	# leurs 274 transformations par frame ne changeait rien a l'image.
+	var directeur_v36: bool = v36 != null and bool(v36.get("_installe"))
+	if not directeur_v36:
+		_maj_piste()
+
 	_maj_vehicule(steer, turbo, dt)
 	_maj_hud(turbo)
 

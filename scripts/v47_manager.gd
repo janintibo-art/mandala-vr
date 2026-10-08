@@ -38,7 +38,9 @@ const BURST_INSTANCES: int = BURST_SLOTS * PETALS
 const BOSS_WEAKPOINTS: int = 8
 
 var app = null
+var v8 = null
 var v26 = null
+var v29 = null
 var v31 = null
 var v32 = null
 var v33 = null
@@ -115,7 +117,9 @@ var _snapshot: Dictionary = {}
 
 func _ready() -> void:
 	app = get_parent()
+	v8 = app.get_node_or_null("V8Manager")
 	v26 = app.get_node_or_null("V26Manager")
+	v29 = app.get_node_or_null("V29Manager")
 	v31 = app.get_node_or_null("V31Manager")
 	v32 = app.get_node_or_null("V32Manager")
 	v33 = app.get_node_or_null("V33Manager")
@@ -274,7 +278,7 @@ func _add_home_card() -> void:
 		grid,
 		"TIR MANDALA\nCibles, combos, boss et 360 degres",
 		Color(0.18, 0.62, 0.76),
-		Callable(self, "demarrer"))
+		func() -> void: v32.call("_aller_page", "Tir"))
 
 
 func _set_difficulty(i: int) -> void:
@@ -580,10 +584,27 @@ func _demarrer_differe() -> void:
 	var main_help_v: Variant = app.get("_aide")
 	var main_ray_v: Variant = app.get("_rayon")
 
+	var paysage: Node3D = null
+	var paysage_visible: bool = false
+	if v29 != null:
+		var pv: Variant = v29.get("_racine")
+		if pv is Node3D:
+			paysage = pv
+			paysage_visible = paysage.visible
+
+	var passthrough_avant: bool = false
+	if v8 != null:
+		passthrough_avant = bool(v8.get("_passthrough"))
+		if passthrough_avant and v8.has_method("_set_passthrough"):
+			v8.call("_set_passthrough", false)
+
 	_snapshot = {
 		"sc_visible": app.sc.visible,
 		"sc_transform": app.sc.global_transform,
 		"sol_visible": app.sol.visible,
+		"paysage": paysage,
+		"paysage_visible": paysage_visible,
+		"passthrough": passthrough_avant,
 		"main_hud_visible": (main_hud_v as Node3D).visible if main_hud_v is Node3D else true,
 		"msg_visible": (main_msg_v as Node3D).visible if main_msg_v is Node3D else true,
 		"help_visible": (main_help_v as Node3D).visible if main_help_v is Node3D else true,
@@ -594,6 +615,8 @@ func _demarrer_differe() -> void:
 	app.sc.visible = false
 	app.sc.global_position = Vector3(0.0, -1000.0, 0.0)
 	app.sol.visible = false
+	if paysage != null:
+		paysage.visible = false
 
 	if main_hud_v is Node3D:
 		(main_hud_v as Node3D).visible = false
@@ -647,6 +670,17 @@ func arreter() -> void:
 		app.sc.visible = bool(_snapshot.get("sc_visible", true))
 		app.sol.visible = bool(_snapshot.get("sol_visible", true))
 		app.main_g.pose = StringName(str(_snapshot.get("left_pose", "default")))
+
+		var paysage_v: Variant = _snapshot.get("paysage", null)
+		if paysage_v is Node3D and is_instance_valid(paysage_v):
+			(paysage_v as Node3D).visible = bool(_snapshot.get("paysage_visible", true))
+
+		if (
+			bool(_snapshot.get("passthrough", false))
+			and v8 != null
+			and v8.has_method("_set_passthrough")
+		):
+			v8.call("_set_passthrough", true)
 
 		var main_hud_v: Variant = app.get("_hud")
 		var main_msg_v: Variant = app.get("_msg_label")
@@ -1107,13 +1141,20 @@ func _hit_target(i: int, controller: XRController3D) -> void:
 	if type_id == TYPE_BOMBE:
 		_bomb_area(pos)
 	elif type_id == TYPE_DIVISEE:
-		_split_target(pos, int(t["color_id"]))
+		_split_target(
+			pos,
+			int(t["color_id"]),
+			bool(t["radial_360"]))
 
 	_bonus_followup(pos)
 	_maybe_bonus()
 
 
-func _split_target(center: Vector3, color_id: int) -> void:
+func _split_target(
+	center: Vector3,
+	color_id: int,
+	radial_360: bool
+) -> void:
 	for side in [-1.0, 1.0]:
 		var index: int = _free_target()
 		if index < 0:
@@ -1122,7 +1163,13 @@ func _split_target(center: Vector3, color_id: int) -> void:
 			0.52 * float(side),
 			0.20 * float(side),
 			-0.15)
-		_activate_target(index, TYPE_RAPIDE, child_pos, color_id, false, true)
+		_activate_target(
+			index,
+			TYPE_RAPIDE,
+			child_pos,
+			color_id,
+			radial_360,
+			true)
 
 
 func _bomb_area(center: Vector3) -> void:

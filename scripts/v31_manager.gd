@@ -23,6 +23,8 @@ var app = null
 var v8 = null
 var v23 = null
 var v29 = null
+var v32 = null
+var v36 = null
 var _installe: bool = false
 var _prefs: Dictionary = {}
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
@@ -65,6 +67,8 @@ func _ready() -> void:
 	v8 = app.get_node_or_null("V8Manager")
 	v23 = app.get_node_or_null("V23Manager")
 	v29 = app.get_node_or_null("V29Manager")
+	v32 = app.get_node_or_null("V32Manager")
+	v36 = app.get_node_or_null("V36Manager")
 	process_priority = 250
 	_rng.randomize()
 	_charger()
@@ -520,7 +524,19 @@ func _maj_grand8(dt: float) -> void:
 	_centre_local = _centre_local.lerp(app.camera.position, clampf(dt * 0.45, 0.0, 1.0))
 	_racine.position = _centre_local
 
-	_maj_anneaux()
+	# v50 : en mode "Grand 8 de la mort", v36 redessine les memes
+	# 56 anneaux juste apres nous. On evite donc ce calcul double.
+	var anneaux_externes: bool = (
+		v32 != null
+		and v36 != null
+		and bool(v36.get("_installe"))
+		and bool(v32.get("_mort"))
+		and int(v32.get("_etat_mort")) == 0
+	)
+	if not anneaux_externes:
+		_maj_anneaux()
+
+	# Les trainees restent actives : elles participent au flux de proximite.
 	_maj_trainees()
 	_regler_vignette()
 

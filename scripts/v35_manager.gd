@@ -431,7 +431,14 @@ func _maj_course_v2(_dt: float) -> void:
 		if _course_tube_node != null:
 			_course_tube_node.visible = actif
 
-	if not actif or _course_tube_mm == null:
+	# v50 : v36 cache definitivement ce tube lorsqu'il prend la main.
+	# Il etait pourtant encore recalcule (360 transforms/frame).
+	if (
+		not actif
+		or _course_tube_mm == null
+		or _course_tube_node == null
+		or not _course_tube_node.visible
+	):
 		return
 
 	var distance: float = float(v33.get("_distance"))
@@ -478,15 +485,6 @@ func _maj_course_v2(_dt: float) -> void:
 			idx += 1
 
 	var secteur: int = int(floor(distance / 220.0)) % 6
-	var secteurs: Array = [
-		"NOVA",
-		"PRISME",
-		"AURORA",
-		"MATRIX",
-		"INFERNO",
-		"ABYSSE",
-	]
-
 	if _course_tube_mat != null:
 		var puls: float = 1.55 + 0.45 * sin(distance * 0.055)
 		_course_tube_mat.emission_energy_multiplier = puls
