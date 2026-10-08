@@ -1,7 +1,8 @@
 class_name V53RideFXManager
 extends Node
-## Mandala VR v53 : consolidation des effets Grand 8 / Course.
+## Mandala VR v53/v54 : consolidation des effets Grand 8 / Course.
 ##
+## v54 corrige les liaisons internes de la consolidation.
 ## Regroupe les anciennes couches v38, v39, v40 et v41 :
 ## - flux de proximite ;
 ## - evenements ponctuels ;
@@ -95,7 +96,6 @@ func _installer() -> void:
 	_layer39.v32 = v32
 	_layer39.v33 = v33
 	_layer39.v36 = v36
-	_layer39.v38 = _layer38
 	_layer39._installer()
 
 	_layer40 = Layer40.new()
@@ -114,7 +114,6 @@ func _installer() -> void:
 	_layer41.v32 = v32
 	_layer41.v33 = v33
 	_layer41.v36 = v36
-	_layer41.v40 = _layer40
 	_layer41._installer()
 
 	_installe = true
@@ -889,6 +888,9 @@ class Layer39:
 
 class Layer40:
 	## v51 : ordonnancement optimise des couches decoratives Quest.
+	# v54 : références internes conservées après consolidation.
+	var v38 = null
+	var v39 = null
 	## Mandala VR v40 : mise en scene dynamique.
 	## Chaque evenement suit preparation -> tension -> climax -> relance.
 
